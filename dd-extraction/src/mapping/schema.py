@@ -1,6 +1,7 @@
 """
-60-column Dynamics inventory schema definition.
-Maps columns A-BH with section areas, requirement tiers, and validation rules.
+54-column Dynamics inventory schema definition.
+Maps columns A-BB with section areas, requirement tiers, and validation rules.
+Updated to match the new sample inventory template (54 columns).
 """
 from dataclasses import dataclass, field, fields, asdict
 from typing import Optional
@@ -17,32 +18,36 @@ class ColumnDef:
     data_type: str = "text"
 
 
-# The full 60-column schema matching the NSS Inventory File
+# The full 54-column schema matching the new inventory template
+# Removed from old 60-col: Currency, Conversion Rate, Monthly Recurring Cost per Currency,
+#   Point to Number, Z Location Name If One Given By Carrier, Billing Per Contract
+# Renamed: "Service Address 1" -> "Service Address"
+# Reordered contract area: Contract File Name now at index 50 (before Contract Number)
 INVENTORY_SCHEMA: list[ColumnDef] = [
     # DD2 Information Area (A-C)
     ColumnDef("A", "Status", "DD2 Information Area", "Required"),
     ColumnDef("B", "Inventory creation questions, concerns, or notes.", "DD2 Information Area", "Only Used as Needed"),
-    ColumnDef("C", "*Contract Info received", "DD2 Information Area", "Required if Applicable"),
+    ColumnDef("C", "*Contract Info received", "DD2 Information Area", "Required"),
 
     # File Information Area (D-F)
     ColumnDef("D", "Invoice File Name", "File Information Area", "Required"),
-    ColumnDef("E", "Files Used For Inventory", "File Information Area", "Required if Applicable"),
+    ColumnDef("E", "Files Used For Inventory", "File Information Area", ""),
     ColumnDef("F", "Billing Name", "File Information Area", "Required"),
 
     # Location Area (G-L)
-    ColumnDef("G", "Service Address 1", "Location Area", "Required"),
-    ColumnDef("H", "Service Address 2", "Location Area", "Only Used as Needed"),
-    ColumnDef("I", "City", "Location Area", "Required"),
-    ColumnDef("J", "State", "Location Area", "Required"),
-    ColumnDef("K", "Zip", "Location Area", "Required"),
-    ColumnDef("L", "Country", "Location Area", "Required if Applicable"),
+    ColumnDef("G", "Service Address", "Location Area", "Required"),
+    ColumnDef("H", "Service Address 2", "Location Area", ""),
+    ColumnDef("I", "City", "Location Area", ""),
+    ColumnDef("J", "State", "Location Area", ""),
+    ColumnDef("K", "Zip", "Location Area", ""),
+    ColumnDef("L", "Country", "Location Area", ""),
 
     # Carrier Information Area (M-R)
     ColumnDef("M", "Carrier", "Carrier Information Area", "Required"),
     ColumnDef("N", "Master Account", "Carrier Information Area", "Required if Applicable"),
     ColumnDef("O", "Carrier Account Number", "Carrier Information Area", "Required"),
-    ColumnDef("P", "Sub-Account Number", "Carrier Information Area", "Required if Applicable"),
-    ColumnDef("Q", "Sub-Account Number 2", "Carrier Information Area", "Only Used as Needed"),
+    ColumnDef("P", "Sub-Account Number", "Carrier Information Area", ""),
+    ColumnDef("Q", "Sub-Account Number 2", "Carrier Information Area", ""),
     ColumnDef("R", "BTN", "Carrier Information Area", "Required if Applicable"),
 
     # Service Area (S-W)
@@ -52,52 +57,46 @@ INVENTORY_SCHEMA: list[ColumnDef] = [
     ColumnDef("V", "Service Type", "Service Area", "Required"),
     ColumnDef("W", "Service Type 2", "Service Area", "Only Used as Needed"),
 
-    # Component Area (X-AG)
-    ColumnDef("X", "USOC", "Component Area", "Required if Applicable"),
+    # Component Area (X-AD)
+    ColumnDef("X", "USOC", "Component Area", "Only Used as Needed"),
     ColumnDef("Y", "Service or Component", "Component Area", "Required"),
-    ColumnDef("Z", "Component or Feature Name", "Component Area", "Required if Applicable"),
+    ColumnDef("Z", "Component or Feature Name", "Component Area", "Required"),
     ColumnDef("AA", "Monthly Recurring Cost", "Component Area", "Required", "currency"),
     ColumnDef("AB", "Quanity", "Component Area", "Required if Applicable", "number"),
     ColumnDef("AC", "Cost Per Unit", "Component Area", "Required if Applicable", "currency"),
-    ColumnDef("AD", "Currency", "Component Area", "Required if Applicable"),
-    ColumnDef("AE", "Conversion Rate", "Component Area", "Only Used as Needed", "number"),
-    ColumnDef("AF", "Monthly Recurring Cost per Currency", "Component Area", "Only Used as Needed", "currency"),
-    ColumnDef("AG", "Charge Type", "Component Area", "Required"),
+    ColumnDef("AD", "Charge Type", "Component Area", "Required"),
 
-    # Additional Component Area (AH-AL)
-    ColumnDef("AH", "# Calls", "Additional Component Area", "List if Available", "number"),
-    ColumnDef("AI", "LD Minutes", "Additional Component Area", "List if Available", "number"),
-    ColumnDef("AJ", "LD Cost", "Additional Component Area", "List if Available", "currency"),
-    ColumnDef("AK", "Rate", "Additional Component Area", "List if Available", "number"),
-    ColumnDef("AL", "LD Flat Rate", "Additional Component Area", "List if Available", "currency"),
+    # Additional Component Area (AE-AI)
+    ColumnDef("AE", "# Calls", "Additional Component Area", "List if Available", "number"),
+    ColumnDef("AF", "LD Minutes", "Additional Component Area", "", "number"),
+    ColumnDef("AG", "LD Cost", "Additional Component Area", "", "currency"),
+    ColumnDef("AH", "Rate", "Additional Component Area", ""),
+    ColumnDef("AI", "LD Flat Rate", "Additional Component Area", "", "currency"),
 
-    # Circuit Speed Area (AM-AP)
-    ColumnDef("AM", "Point to Number", "Circuit Speed Area", "Only Used as Needed"),
-    ColumnDef("AN", "Port Speed", "Circuit Speed Area", "Required if Applicable"),
-    ColumnDef("AO", "Access Speed", "Circuit Speed Area", "Required if Applicable"),
-    ColumnDef("AP", "Upload Speed", "Circuit Speed Area", "Only Used as Needed"),
+    # Circuit Speed Area (AJ-AL)
+    ColumnDef("AJ", "Port Speed", "Circuit Speed Area", "Required if Applicable"),
+    ColumnDef("AK", "Access Speed", "Circuit Speed Area", "Required if Applicable"),
+    ColumnDef("AL", "Upload Speed", "Circuit Speed Area", ""),
 
-    # Z Location Area (AQ-AW)
-    ColumnDef("AQ", "Z Address 1", "Z Location Area", "Required for Ticket Closure"),
-    ColumnDef("AR", "Z Address 2", "Z Location Area", "Only Used as Needed"),
-    ColumnDef("AS", "Z City", "Z Location Area", "Required for Ticket Closure"),
-    ColumnDef("AT", "Z State", "Z Location Area", "Required for Ticket Closure"),
-    ColumnDef("AU", "Z Zip Code", "Z Location Area", "Required for Ticket Closure"),
-    ColumnDef("AV", "Z Country", "Z Location Area", "Only Used as Needed"),
-    ColumnDef("AW", "Z Location Name If One Given By Carrier", "Z Location Area", "Only Used as Needed"),
+    # Z Location Area (AM-AR)
+    ColumnDef("AM", "Z Address 1", "Z Location Area", ""),
+    ColumnDef("AN", "Z Address 2", "Z Location Area", ""),
+    ColumnDef("AO", "Z City", "Z Location Area", ""),
+    ColumnDef("AP", "Z State", "Z Location Area", ""),
+    ColumnDef("AQ", "Z Zip Code", "Z Location Area", ""),
+    ColumnDef("AR", "Z Country", "Z Location Area", ""),
 
-    # Contract Area (AX-BH)
-    ColumnDef("AX", "*Contract - Term Months", "Contract Area", "Required for Ticket Closure", "number"),
-    ColumnDef("AY", "*Contract - Begin Date", "Contract Area", "Required for Ticket Closure", "date"),
-    ColumnDef("AZ", "*Contract - Expiration Date", "Contract Area", "Required for Ticket Closure", "date"),
-    ColumnDef("BA", "Billing Per Contract", "Contract Area", "Required for Ticket Closure", "currency"),
-    ColumnDef("BB", "*Currently Month-to-Month", "Contract Area", "Required for Ticket Closure"),
-    ColumnDef("BC", "Month to Month or Less Than a Year Remaining", "Contract Area", "Only Used as Needed", "date"),
-    ColumnDef("BD", "Contract Number", "Contract Area", "Only Used as Needed"),
-    ColumnDef("BE", "Contract File Name", "Contract Area", "Required if Applicable"),
-    ColumnDef("BF", "2nd Contract Number", "Contract Area", "Only Used as Needed"),
-    ColumnDef("BG", "*Auto Renew", "Contract Area", "Required for Ticket Closure"),
-    ColumnDef("BH", "Auto Renewal Notes and Removal Requirements", "Contract Area", "Only Used as Needed"),
+    # Contract Area (AS-BB)
+    ColumnDef("AS", "*Contract - Term Months", "CONTRACT AREA", "Required for Ticket Closure", "number"),
+    ColumnDef("AT", "*Contract - Begin Date", "CONTRACT AREA", "", "date"),
+    ColumnDef("AU", "*Contract - Expiration Date", "CONTRACT AREA", "", "date"),
+    ColumnDef("AV", "*Currently Month-to-Month", "CONTRACT AREA", "Required for Ticket Closure"),
+    ColumnDef("AW", "Month to Month or Less Than a Year Remaining", "CONTRACT AREA", "Required for Ticket Closure"),
+    ColumnDef("AX", "Contract File Name", "CONTRACT AREA", "Required for Ticket Closure"),
+    ColumnDef("AY", "Contract Number", "CONTRACT AREA", "Only Used as Needed"),
+    ColumnDef("AZ", "2nd Contract Number", "CONTRACT AREA", "Only Used as Needed"),
+    ColumnDef("BA", "*Auto Renew", "CONTRACT AREA", "Required for Ticket Closure"),
+    ColumnDef("BB", "Auto Renewal Notes and Removal Requirements", "CONTRACT AREA", "Only Used as Needed"),
 ]
 
 # Quick lookup dictionaries
@@ -116,55 +115,66 @@ SECTION_AREAS = {
     "Location Area": ("G", "L"),
     "Carrier Information Area": ("M", "R"),
     "Service Area": ("S", "W"),
-    "Component Area": ("X", "AG"),
-    "Additional Component Area": ("AH", "AL"),
-    "Circuit Speed Area": ("AM", "AP"),
-    "Z Location Area": ("AQ", "AW"),
-    "Contract Area": ("AX", "BH"),
+    "Component Area": ("X", "AD"),
+    "Additional Component Area": ("AE", "AI"),
+    "Circuit Speed Area": ("AJ", "AL"),
+    "Z Location Area": ("AM", "AR"),
+    "CONTRACT AREA": ("AS", "BB"),
 }
 
 
 # --- Dropdown Validation Lists ---
 
+# Status dropdown (4 values)
+STATUS_VALUES = [
+    "Complete",
+    "Withdrawn",
+    "Pending",
+    "Partially Obtained",
+]
+
+# 86 valid Service Types from the new template
 SERVICE_TYPES = [
-    "Account Level", "Analog Circuits", "Broadband", "Business Internet",
-    "Call Path", "Cellular", "Centrex", "Cloud Services", "Conference Bridge",
-    "Dark Fiber", "DIA", "Digital Phone Line", "DS0", "DS1", "DS3",
-    "E-Line", "Email Services", "EPL", "Ethernet", "EVPL",
-    "Fax", "Fiber Optic", "Frame Relay", "Hosted PBX", "Hosted VoIP",
-    "HPBX", "Hunt Group", "Internet", "ISDN BRI", "ISDN PRI",
-    "IT Services", "IVR", "Leased Line", "Long Distance",
-    "Managed Firewall", "Managed Network", "Managed Router",
-    "Managed Security", "Managed Services", "Managed WiFi",
-    "Metro Ethernet", "MLPPP", "MPLS", "Multicast",
-    "Network Management", "OC-12", "OC-192", "OC-3", "OC-48",
-    "Other", "PBX", "Point to Point", "POTS", "Private Line",
-    "Ring", "SD-WAN", "SDWAN", "SIP", "SIP Trunk",
-    "Smart Jack", "SONET", "Switches", "T1", "T3",
-    "Toll Free", "Trunk", "TV", "UCaaS",
-    "UPS", "Video", "Virtual Private Line", "VOIP",
-    "VOIP Line", "VoIP Trunk", "VPN", "VPLS",
-    "WAN", "Wavelength", "Web Hosting", "Wide Area Network",
-    "Wireless", "Wireless Backup", "Wireless Internet",
+    "Account Level", "Analog Circuits", "Audit", "Broadband", "Calling Card",
+    "CDN", "Cellular", "Centrex", "Cloud Direct Connection", "CO Muxed T1",
+    "Collocation", "Conferencing", "CPE", "DaaS", "Dark Fiber",
+    "Data Voice Bundled", "DIA", "Dial Up Internet", "DID", "DID Trunks",
+    "DRaaS", "DS1", "DS3", "DSL", "E911",
+    "Electronic Fax", "Ethernet", "Hosted VOIP", "Integrated Circuit",
+    "Inventory Creation", "ISDN BRI", "ISDN PRI", "Listing", "Local Usage",
+    "Long Distance", "MPLS", "NET MGMT", "PBX/Biz Trunks", "Point to Point",
+    "POTS", "RCF", "SDWAN", "SIP Trunk", "Sonet",
+    "Telecom Management", "Telecom Project Management", "TF - Dedicated",
+    "TF - Switched", "TV", "UCaaS", "Usage", "Virus Protection",
+    "Voice Mail", "VOIP DID", "VOIP Line", "VPLS", "VPN", "VTN",
+    "Wireless Cellular Internet", "Wireless DIA",
+    # Additional types
+    "ABN", "AVTS", "Branch Office Extension (BOE)", "Cable Internet",
+    "Cloud Storage", "Completelink", "DIA-Managed", "DIA-Unmanaged",
+    "FIOS", "Foreign Exchange", "Hosting", "Integrated T1", "IP/Flex",
+    "LD - Dedicated", "LD - Switched", "Managed Network Services", "MDA",
+    "MPLS-Managed", "MPLS-Unmanaged", "P2P Interstate", "P2P Intrastate",
+    "P2P Metro", "Payphone", "TEM - Enhanced", "Uverse", "Wireless Internet",
 ]
 
 CHARGE_TYPES = [
-    "MRC", "NRC", "OCC", "ProRated", "Prorated Charges",
+    "MRC", "NRC", "OCC", "Prorated Charges",
     "Surcharge", "Taxes", "Usage",
 ]
 
 SCU_CODES = ["S", "C", "U", "T\\S\\OCC"]
 
-END_USE_VALUES = ["Alarm", "Elevator", "Fax"]
-
 MONTH_TO_MONTH_VALUES = ["Yes", "No"]
+
+# Kept for backward compatibility with qa.py and other consumers
+END_USE_VALUES = ["Alarm", "Elevator", "Fax"]
 
 
 # --- Inventory Row Dataclass ---
 
 @dataclass
 class InventoryRow:
-    """Represents a single row in the inventory output."""
+    """Represents a single row in the 54-column inventory output."""
     # DD2 Information Area
     status: Optional[str] = None
     notes: Optional[str] = None
@@ -175,8 +185,8 @@ class InventoryRow:
     files_used_for_inventory: Optional[str] = None
     billing_name: Optional[str] = None
 
-    # Location Area
-    service_address_1: Optional[str] = None
+    # Location Area  (renamed: service_address_1 -> service_address)
+    service_address: Optional[str] = None
     service_address_2: Optional[str] = None
     city: Optional[str] = None
     state: Optional[str] = None
@@ -198,16 +208,13 @@ class InventoryRow:
     service_type: Optional[str] = None
     service_type_2: Optional[str] = None
 
-    # Component Area
+    # Component Area  (removed: currency, conversion_rate, mrc_per_currency)
     usoc: Optional[str] = None
     service_or_component: Optional[str] = None  # S, C, U, or T\S\OCC
     component_or_feature_name: Optional[str] = None
     monthly_recurring_cost: Optional[float] = None
     quantity: Optional[float] = None
     cost_per_unit: Optional[float] = None
-    currency: Optional[str] = None
-    conversion_rate: Optional[float] = None
-    mrc_per_currency: Optional[float] = None
     charge_type: Optional[str] = None
 
     # Additional Component Area
@@ -217,32 +224,29 @@ class InventoryRow:
     rate: Optional[float] = None
     ld_flat_rate: Optional[float] = None
 
-    # Circuit Speed Area
-    point_to_number: Optional[str] = None
+    # Circuit Speed Area  (removed: point_to_number)
     port_speed: Optional[str] = None
     access_speed: Optional[str] = None
     upload_speed: Optional[str] = None
 
-    # Z Location Area
+    # Z Location Area  (removed: z_location_name)
     z_service_address_1: Optional[str] = None
     z_service_address_2: Optional[str] = None
     z_city: Optional[str] = None
     z_state: Optional[str] = None
     z_zip: Optional[str] = None
     z_country: Optional[str] = None
-    z_location_name: Optional[str] = None
 
-    # Contract Area
+    # Contract Area  (removed: billing_per_contract; reordered)
     contract_term: Optional[float] = None
     contract_begin_date: Optional[str] = None
     contract_expiration_date: Optional[str] = None
-    billing_per_contract: Optional[float] = None
     currently_month_to_month: Optional[str] = None
-    month_to_month_since: Optional[str] = None
-    month_to_month_rate: Optional[float] = None
+    month_to_month_or_less: Optional[str] = None
     contract_file_name: Optional[str] = None
+    contract_number: Optional[str] = None
+    second_contract_number: Optional[str] = None
     auto_renew: Optional[str] = None
-    auto_renewal_term: Optional[str] = None
     auto_renewal_notes: Optional[str] = None
 
     # Metadata (not output columns)
@@ -250,17 +254,101 @@ class InventoryRow:
     source_files: list = field(default_factory=list)
     linkage_key: Optional[str] = None  # For S-C parent-child linking
 
+    # --- Backward-compatibility aliases for old field names ---
+    # These properties allow existing extraction code that writes to the old
+    # field names to keep working without modification.
+
+    @property
+    def service_address_1(self):
+        return self.service_address
+
+    @service_address_1.setter
+    def service_address_1(self, value):
+        self.service_address = value
+
+    @property
+    def currency(self):
+        return None
+
+    @currency.setter
+    def currency(self, value):
+        pass  # silently discard — column removed
+
+    @property
+    def conversion_rate(self):
+        return None
+
+    @conversion_rate.setter
+    def conversion_rate(self, value):
+        pass  # silently discard — column removed
+
+    @property
+    def mrc_per_currency(self):
+        return None
+
+    @mrc_per_currency.setter
+    def mrc_per_currency(self, value):
+        pass  # silently discard — column removed
+
+    @property
+    def point_to_number(self):
+        return None
+
+    @point_to_number.setter
+    def point_to_number(self, value):
+        pass  # silently discard — column removed
+
+    @property
+    def z_location_name(self):
+        return None
+
+    @z_location_name.setter
+    def z_location_name(self, value):
+        pass  # silently discard — column removed
+
+    @property
+    def billing_per_contract(self):
+        return None
+
+    @billing_per_contract.setter
+    def billing_per_contract(self, value):
+        pass  # silently discard — column removed
+
+    # Alias old field names that were renamed/repurposed in Contract Area
+    @property
+    def month_to_month_since(self):
+        return self.month_to_month_or_less
+
+    @month_to_month_since.setter
+    def month_to_month_since(self, value):
+        self.month_to_month_or_less = value
+
+    @property
+    def month_to_month_rate(self):
+        return self.contract_number
+
+    @month_to_month_rate.setter
+    def month_to_month_rate(self, value):
+        self.contract_number = value
+
+    @property
+    def auto_renewal_term(self):
+        return self.second_contract_number
+
+    @auto_renewal_term.setter
+    def auto_renewal_term(self, value):
+        self.second_contract_number = value
+
     def to_row_dict(self) -> dict:
-        """Convert to ordered dict matching column names for output."""
+        """Convert to ordered dict matching the 54-column names for output."""
         field_to_column = {
             "status": "Status",
             "notes": "Inventory creation questions, concerns, or notes.",
             "contract_info_received": "*Contract Info received",
-            # Note: quantity uses the misspelled name from the reference file
             "invoice_file_name": "Invoice File Name",
             "files_used_for_inventory": "Files Used For Inventory",
             "billing_name": "Billing Name",
-            "service_address_1": "Service Address 1",
+            "service_address": "Service Address",
             "service_address_2": "Service Address 2",
             "city": "City",
             "state": "State",
@@ -283,16 +371,12 @@ class InventoryRow:
             "monthly_recurring_cost": "Monthly Recurring Cost",
             "quantity": "Quanity",
             "cost_per_unit": "Cost Per Unit",
-            "currency": "Currency",
-            "conversion_rate": "Conversion Rate",
-            "mrc_per_currency": "Monthly Recurring Cost per Currency",
             "charge_type": "Charge Type",
             "num_calls": "# Calls",
             "ld_minutes": "LD Minutes",
             "ld_cost": "LD Cost",
             "rate": "Rate",
             "ld_flat_rate": "LD Flat Rate",
-            "point_to_number": "Point to Number",
             "port_speed": "Port Speed",
             "access_speed": "Access Speed",
             "upload_speed": "Upload Speed",
@@ -302,17 +386,15 @@ class InventoryRow:
             "z_state": "Z State",
             "z_zip": "Z Zip Code",
             "z_country": "Z Country",
-            "z_location_name": "Z Location Name If One Given By Carrier",
             "contract_term": "*Contract - Term Months",
             "contract_begin_date": "*Contract - Begin Date",
             "contract_expiration_date": "*Contract - Expiration Date",
-            "billing_per_contract": "Billing Per Contract",
             "currently_month_to_month": "*Currently Month-to-Month",
-            "month_to_month_since": "Month to Month or Less Than a Year Remaining",
-            "month_to_month_rate": "Contract Number",
+            "month_to_month_or_less": "Month to Month or Less Than a Year Remaining",
             "contract_file_name": "Contract File Name",
+            "contract_number": "Contract Number",
+            "second_contract_number": "2nd Contract Number",
             "auto_renew": "*Auto Renew",
-            "auto_renewal_term": "2nd Contract Number",
             "auto_renewal_notes": "Auto Renewal Notes and Removal Requirements",
         }
         result = {}
@@ -323,26 +405,19 @@ class InventoryRow:
     @classmethod
     def column_field_map(cls) -> dict[str, str]:
         """Map column names to dataclass field names."""
-        row = cls()
-        row_dict = row.to_row_dict()
-        inv = {}
-        for f in fields(cls):
-            if f.name in ("confidence", "source_files", "linkage_key"):
-                continue
-            val_in_dict = {col: attr for attr, col in _build_field_to_column().items()}
-        return val_in_dict
+        return {v: k for k, v in _build_field_to_column().items()}
 
 
 def _build_field_to_column() -> dict[str, str]:
-    """Internal helper to build field→column mapping."""
+    """Internal helper to build field->column mapping (54 columns)."""
     return {
         "status": "Status",
-        "notes": "Notes",
-        "contract_info_received": "Contract Info received",
+        "notes": "Inventory creation questions, concerns, or notes.",
+        "contract_info_received": "*Contract Info received",
         "invoice_file_name": "Invoice File Name",
         "files_used_for_inventory": "Files Used For Inventory",
         "billing_name": "Billing Name",
-        "service_address_1": "Service Address 1",
+        "service_address": "Service Address",
         "service_address_2": "Service Address 2",
         "city": "City",
         "state": "State",
@@ -363,42 +438,36 @@ def _build_field_to_column() -> dict[str, str]:
         "service_or_component": "Service or Component",
         "component_or_feature_name": "Component or Feature Name",
         "monthly_recurring_cost": "Monthly Recurring Cost",
-        "quantity": "Quantity",
+        "quantity": "Quanity",
         "cost_per_unit": "Cost Per Unit",
-        "currency": "Currency",
-        "conversion_rate": "Conversion Rate",
-        "mrc_per_currency": "MRC per Currency",
         "charge_type": "Charge Type",
         "num_calls": "# Calls",
         "ld_minutes": "LD Minutes",
         "ld_cost": "LD Cost",
         "rate": "Rate",
         "ld_flat_rate": "LD Flat Rate",
-        "point_to_number": "Point to Number",
         "port_speed": "Port Speed",
         "access_speed": "Access Speed",
         "upload_speed": "Upload Speed",
-        "z_service_address_1": "Z Service Address 1",
-        "z_service_address_2": "Z Service Address 2",
+        "z_service_address_1": "Z Address 1",
+        "z_service_address_2": "Z Address 2",
         "z_city": "Z City",
         "z_state": "Z State",
-        "z_zip": "Z Zip",
+        "z_zip": "Z Zip Code",
         "z_country": "Z Country",
-        "z_location_name": "Z Location Name",
-        "contract_term": "Contract Term",
-        "contract_begin_date": "Contract Begin Date",
-        "contract_expiration_date": "Contract Expiration Date",
-        "billing_per_contract": "Billing Per Contract",
-        "currently_month_to_month": "Currently Month-to-Month",
-        "month_to_month_since": "Month-to-Month Since",
-        "month_to_month_rate": "Month-to-Month Rate",
+        "contract_term": "*Contract - Term Months",
+        "contract_begin_date": "*Contract - Begin Date",
+        "contract_expiration_date": "*Contract - Expiration Date",
+        "currently_month_to_month": "*Currently Month-to-Month",
+        "month_to_month_or_less": "Month to Month or Less Than a Year Remaining",
         "contract_file_name": "Contract File Name",
-        "auto_renew": "Auto Renew",
-        "auto_renewal_term": "Auto Renewal Term",
-        "auto_renewal_notes": "Auto Renewal Notes",
+        "contract_number": "Contract Number",
+        "second_contract_number": "2nd Contract Number",
+        "auto_renew": "*Auto Renew",
+        "auto_renewal_notes": "Auto Renewal Notes and Removal Requirements",
     }
 
 
-# Column name → field name reverse mapping
+# Column name -> field name reverse mapping
 COLUMN_TO_FIELD = {v: k for k, v in _build_field_to_column().items()}
 FIELD_TO_COLUMN = _build_field_to_column()

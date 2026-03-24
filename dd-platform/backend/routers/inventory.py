@@ -20,7 +20,7 @@ _row_status_store: dict[str, dict[int, dict]] = {}  # project_id -> { row_index 
 # Required fields used to compute per-row accuracy
 _REQUIRED_FIELDS = [
     "Carrier", "Carrier Account Number", "Service Type", "Charge Type",
-    "Service or Component", "Billing Name", "Service Address 1", "City",
+    "Service or Component", "Billing Name", "Service Address", "City",
     "State", "Zip", "Phone Number", "Carrier Circuit Number",
     "Monthly Recurring Cost", "Component or Feature Name",
 ]
@@ -56,9 +56,9 @@ def _get_row_status(project_id: str, row_index: int, accuracy: int) -> str:
     return "need_review"
 
 
-def _get_source_files(proj: dict, carrier_name: str = "") -> list[str]:
-    """Get list of source document filenames for a specific carrier."""
-    source_files: list[str] = []
+def _get_source_files(proj: dict, carrier_name: str = "") -> list[dict]:
+    """Get list of source document info (label + path) for a specific carrier."""
+    source_files: list[dict] = []
     input_dir = Path(proj.get("input_dir", ""))
 
     if not input_dir.exists():
@@ -84,14 +84,26 @@ def _get_source_files(proj: dict, carrier_name: str = "") -> list[str]:
                             doc_type = "Invoice" if "invoice" in category.lower() else \
                                        "Contract" if "contract" in category.lower() else \
                                        "Report" if "report" in category.lower() else "CSR"
-                            source_files.append(f"{doc_type}: {f.name}")
+                            source_files.append({
+                                "label": f"{doc_type}: {f.name}",
+                                "name": f.name,
+                                "path": str(f),
+                                "format": f.suffix.lower().lstrip("."),
+                                "doc_type": doc_type.lower(),
+                            })
             elif sub.is_file() and carrier_words:
                 # Check files directly in category folder
                 if any(w in sub.name.lower() for w in carrier_words):
                     doc_type = "Invoice" if "invoice" in category.lower() else \
                                "Contract" if "contract" in category.lower() else \
                                "Report" if "report" in category.lower() else "CSR"
-                    source_files.append(f"{doc_type}: {sub.name}")
+                    source_files.append({
+                        "label": f"{doc_type}: {sub.name}",
+                        "name": sub.name,
+                        "path": str(sub),
+                        "format": sub.suffix.lower().lstrip("."),
+                        "doc_type": doc_type.lower(),
+                    })
 
     return source_files[:15]
 
@@ -187,7 +199,7 @@ async def list_inventory(
     sort_by: str = None,
     sort_dir: str = "asc",
     page: int = 1,
-    page_size: int = 100,
+    page_size: int = 50,
     source: str = "reference",
     sheet: str = "Baseline",
 ):

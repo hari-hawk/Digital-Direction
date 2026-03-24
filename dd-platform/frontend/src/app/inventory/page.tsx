@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { api, RowDetailResponse, ConfidenceSummary } from "@/lib/api";
+import { api, RowDetailResponse, ConfidenceSummary, SourceDocument } from "@/lib/api";
 import { useProjectIdWithReady } from "@/hooks/useProjectId";
 
 interface SheetInfo { name: string; rows: number; cols: number }
@@ -60,6 +60,116 @@ const _REQUIRED_FIELDS_SET = new Set([
   "state", "zip", "monthly recurring cost",
 ]);
 
+const API_BASE = "http://127.0.0.1:8000/api";
+
+// Document Preview Modal — opens source documents inline
+function DocumentPreviewModal({
+  doc,
+  projectId,
+  onClose,
+}: {
+  doc: SourceDocument;
+  projectId: string;
+  onClose: () => void;
+}) {
+  const inlineUrl = `${API_BASE}/projects/${projectId}/documents/file?file_path=${encodeURIComponent(doc.path)}&mode=inline`;
+  const downloadUrl = `${API_BASE}/projects/${projectId}/documents/file?file_path=${encodeURIComponent(doc.path)}&mode=download`;
+  const isPdf = doc.format === "pdf";
+  const isExcel = ["xlsx", "xls", "csv"].includes(doc.format);
+  const isImage = ["png", "jpg", "jpeg", "gif"].includes(doc.format);
+
+  const [excelData, setExcelData] = useState<{ headers: string[]; rows: string[][] } | null>(null);
+  const [excelLoading, setExcelLoading] = useState(false);
+
+  useEffect(() => {
+    if (isExcel) {
+      setExcelLoading(true);
+      fetch(`${API_BASE}/projects/${projectId}/documents/preview-excel?file_path=${encodeURIComponent(doc.path)}`)
+        .then((r) => r.json()).then((d) => { setExcelData(d); setExcelLoading(false); })
+        .catch(() => setExcelLoading(false));
+    }
+  }, [doc.path, isExcel, projectId]);
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative w-[85vw] h-[85vh] bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="text-2xl">{isPdf ? "📄" : isExcel ? "📊" : "📁"}</span>
+            <div className="min-w-0">
+              <h2 className="text-lg font-semibold truncate">{doc.name}</h2>
+              <div className="flex items-center gap-3 mt-0.5">
+                <span className="text-xs text-zinc-500 uppercase">{doc.format}</span>
+                <span className="text-xs text-zinc-500">{doc.doc_type}</span>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <a href={downloadUrl} download={doc.name} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm">Download</a>
+            <button onClick={onClose} className="w-9 h-9 flex items-center justify-center rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white text-lg">X</button>
+          </div>
+        </div>
+        <div className="flex-1 overflow-auto bg-zinc-950">
+          {isPdf && (
+            <object data={inlineUrl} type="application/pdf" className="w-full h-full" title={doc.name}>
+              <iframe src={inlineUrl} className="w-full h-full border-0" title={doc.name} />
+            </object>
+          )}
+          {isImage && (
+            <div className="flex items-center justify-center h-full p-8">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={inlineUrl} alt={doc.name} className="max-w-full max-h-full object-contain rounded" />
+            </div>
+          )}
+          {isExcel && (
+            <div className="p-4">
+              {excelLoading ? <div className="text-zinc-400 text-center py-12">Loading spreadsheet preview...</div>
+              : excelData ? (
+                <div className="overflow-auto">
+                  <table className="w-full text-xs border-collapse">
+                    <thead className="sticky top-0 bg-zinc-900">
+                      <tr>
+                        <th className="text-left py-2 px-2 text-zinc-600 font-mono border-b border-zinc-800">#</th>
+                        {excelData.headers.map((h, i) => (
+                          <th key={i} className="text-left py-2 px-2 text-zinc-400 font-medium border-b border-zinc-800 whitespace-nowrap">{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {excelData.rows.map((row, ri) => (
+                        <tr key={ri} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
+                          <td className="py-1 px-2 text-zinc-600 font-mono">{ri + 1}</td>
+                          {row.map((cell, ci) => (
+                            <td key={ci} className="py-1 px-2 text-zinc-300 max-w-[200px] truncate" title={cell}>{cell}</td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : <div className="text-zinc-400 text-center py-12">Could not preview. <a href={downloadUrl} download className="text-blue-400">Download</a></div>}
+            </div>
+          )}
+          {!isPdf && !isExcel && !isImage && (
+            <div className="flex flex-col items-center justify-center h-full gap-4 text-zinc-400">
+              <span className="text-5xl">📄</span>
+              <p>Preview not available for .{doc.format} files</p>
+              <a href={downloadUrl} download={doc.name} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm text-white">Download File</a>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Row Detail Slider Panel
 // ═══════════════════════════════════════════
 function RowDetailSlider({
@@ -81,6 +191,7 @@ function RowDetailSlider({
   const [status, setStatus] = useState("in_progress");
   const [comment, setComment] = useState("");
   const [saving, setSaving] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState<SourceDocument | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -146,6 +257,15 @@ function RowDetailSlider({
 
   return (
     <div>
+      {/* Document Preview Modal — renders above the slider */}
+      {previewDoc && (
+        <DocumentPreviewModal
+          doc={previewDoc}
+          projectId={projectId}
+          onClose={() => setPreviewDoc(null)}
+        />
+      )}
+
       {/* Backdrop */}
       <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={onClose} />
 
@@ -215,23 +335,35 @@ function RowDetailSlider({
                 </div>
               )}
 
-              {/* Source Documents — Clickable pills */}
+              {/* Source Documents — Clickable pills that open preview modal */}
               {detail.source_documents && detail.source_documents.length > 0 && (
                 <div className="mb-4">
                   <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Source Documents</h3>
                   <div className="flex flex-wrap gap-1.5">
                     {detail.source_documents.map((doc, i) => {
-                      const ext = doc.split(".").pop()?.toLowerCase() || "";
+                      // Support both old string format and new object format
+                      const isObj = typeof doc === "object" && doc !== null;
+                      const docLabel = isObj ? (doc as SourceDocument).label : String(doc);
+                      const docName = isObj ? (doc as SourceDocument).name : String(doc).split("/").pop() || "";
+                      const ext = docName.split(".").pop()?.toLowerCase() || "";
                       const typeInfo = ext === "pdf" ? { icon: "📄", label: "Invoice", cls: "border-blue-500/30 bg-blue-500/10 text-blue-300" }
                         : ["xlsx", "xls", "csv"].includes(ext) ? { icon: "📊", label: "Report", cls: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" }
                         : ext === "msg" ? { icon: "✉️", label: "Email", cls: "border-purple-500/30 bg-purple-500/10 text-purple-300" }
                         : { icon: "📁", label: "File", cls: "border-zinc-500/30 bg-zinc-500/10 text-zinc-300" };
                       return (
-                        <button key={i} className={`flex items-center gap-1.5 px-2 py-1 rounded-full border text-[10px] hover:opacity-80 transition-opacity ${typeInfo.cls}`}
-                          title={doc}>
+                        <button
+                          key={i}
+                          className={`flex items-center gap-1.5 px-2 py-1 rounded-full border text-[10px] hover:opacity-80 transition-opacity cursor-pointer ${typeInfo.cls}`}
+                          title={`Click to preview: ${docLabel}`}
+                          onClick={() => {
+                            if (isObj) {
+                              setPreviewDoc(doc as SourceDocument);
+                            }
+                          }}
+                        >
                           <span>{typeInfo.icon}</span>
                           <span>{typeInfo.label}</span>
-                          <span className="text-zinc-500 max-w-[100px] truncate">{doc.split("/").pop()}</span>
+                          <span className="text-zinc-500 max-w-[100px] truncate">{docName}</span>
                         </button>
                       );
                     })}
@@ -315,7 +447,7 @@ export default function InventoryPage() {
   const [sheets, setSheets] = useState<SheetInfo[]>([]);
   const [activeSheet, setActiveSheet] = useState("Baseline");
   const [source, setSource] = useState<"reference" | "extracted">("reference");
-  const [rows, setRows] = useState<{ row_index: number; data: Record<string, unknown>; service_or_component?: string; accuracy?: number; status?: string; source_files?: string[] }[]>([]);
+  const [rows, setRows] = useState<{ row_index: number; data: Record<string, unknown>; service_or_component?: string; accuracy?: number; status?: string; source_files?: unknown[] }[]>([]);
   const [columns, setColumns] = useState<string[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -493,6 +625,7 @@ export default function InventoryPage() {
   function clearFilters() {
     setFilters(EMPTY_FILTERS);
     setSearchInput("");
+    setReviewFilter("");
     setSort({ column: "", direction: "asc" });
     setPage(1);
   }
@@ -509,7 +642,7 @@ export default function InventoryPage() {
   }
 
   const totalPages = Math.ceil(total / pageSize);
-  const hasActiveFilters = Object.values(filters).some((v) => v !== "") || searchInput !== "";
+  const hasActiveFilters = Object.values(filters).some((v) => v !== "") || searchInput !== "" || reviewFilter !== "";
   const isChecklist = activeSheet.toLowerCase().includes("checklist");
 
   // Accuracy helper

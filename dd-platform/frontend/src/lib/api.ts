@@ -86,13 +86,21 @@ export interface RowDetailField {
   field_value: unknown;
 }
 
+export interface SourceDocument {
+  label: string;
+  name: string;
+  path: string;
+  format: string;
+  doc_type: string;
+}
+
 export interface RowDetailResponse {
   row_index: number;
   fields: RowDetailField[];
   accuracy_score: number;
   status: string;
   comment: string;
-  source_documents: string[];
+  source_documents: (string | SourceDocument)[];
 }
 
 export interface ExtractionResult {

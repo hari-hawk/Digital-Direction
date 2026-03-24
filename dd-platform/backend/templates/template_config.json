@@ -1,0 +1,533 @@
+{
+  "columns": [
+    {
+      "index": 1,
+      "name": "Status",
+      "section": "DD2 Information Area",
+      "requirement": "Required"
+    },
+    {
+      "index": 2,
+      "name": "Inventory creation questions, concerns, or notes.",
+      "section": "",
+      "requirement": "Only Used as Needed"
+    },
+    {
+      "index": 3,
+      "name": "*Contract Info received",
+      "section": "",
+      "requirement": "Required"
+    },
+    {
+      "index": 4,
+      "name": "Invoice File Name",
+      "section": "File Information Area",
+      "requirement": "Required"
+    },
+    {
+      "index": 5,
+      "name": "Files Used For Inventory",
+      "section": "",
+      "requirement": ""
+    },
+    {
+      "index": 6,
+      "name": "Billing Name",
+      "section": "",
+      "requirement": "RXqXXrXd"
+    },
+    {
+      "index": 7,
+      "name": "Service Address",
+      "section": "Location Area",
+      "requirement": "Required"
+    },
+    {
+      "index": 8,
+      "name": "Service Address 2",
+      "section": "",
+      "requirement": ""
+    },
+    {
+      "index": 9,
+      "name": "City",
+      "section": "",
+      "requirement": ""
+    },
+    {
+      "index": 10,
+      "name": "State",
+      "section": "",
+      "requirement": ""
+    },
+    {
+      "index": 11,
+      "name": "Zip",
+      "section": "",
+      "requirement": ""
+    },
+    {
+      "index": 12,
+      "name": "Country",
+      "section": "",
+      "requirement": ""
+    },
+    {
+      "index": 13,
+      "name": "Carrier",
+      "section": "Carrier Information Area",
+      "requirement": "Required"
+    },
+    {
+      "index": 14,
+      "name": "Master Account",
+      "section": "",
+      "requirement": "Required if Applicable"
+    },
+    {
+      "index": 15,
+      "name": "Carrier Account Number",
+      "section": "",
+      "requirement": "Required"
+    },
+    {
+      "index": 16,
+      "name": "Sub-Account Number",
+      "section": "",
+      "requirement": ""
+    },
+    {
+      "index": 17,
+      "name": "Sub-Account Number 2",
+      "section": "",
+      "requirement": ""
+    },
+    {
+      "index": 18,
+      "name": "BTN",
+      "section": "",
+      "requirement": "Required if Applicable"
+    },
+    {
+      "index": 19,
+      "name": "Phone Number",
+      "section": "ServiceArea",
+      "requirement": "RequiredifApplicable"
+    },
+    {
+      "index": 20,
+      "name": "Carrier Circuit Number",
+      "section": "",
+      "requirement": "Required if Applicable"
+    },
+    {
+      "index": 21,
+      "name": "Additional Circuit IDs",
+      "section": "",
+      "requirement": "Only Used as Needed"
+    },
+    {
+      "index": 22,
+      "name": "Service Type",
+      "section": "",
+      "requirement": "Required"
+    },
+    {
+      "index": 23,
+      "name": "Service Type 2",
+      "section": "",
+      "requirement": "Only Used as Needed"
+    },
+    {
+      "index": 24,
+      "name": "USOC",
+      "section": "Component Area",
+      "requirement": "Only Used as Needed"
+    },
+    {
+      "index": 25,
+      "name": "Service or Component",
+      "section": "",
+      "requirement": "Required"
+    },
+    {
+      "index": 26,
+      "name": "Component or Feature Name",
+      "section": "",
+      "requirement": "Required"
+    },
+    {
+      "index": 27,
+      "name": "Monthly Recurring Cost",
+      "section": "",
+      "requirement": "Required"
+    },
+    {
+      "index": 28,
+      "name": "Quanity",
+      "section": "",
+      "requirement": "Required if Applicable"
+    },
+    {
+      "index": 29,
+      "name": "Cost Per Unit",
+      "section": "",
+      "requirement": "Required if Applicable"
+    },
+    {
+      "index": 30,
+      "name": "Charge Type",
+      "section": "",
+      "requirement": "Required"
+    },
+    {
+      "index": 31,
+      "name": "# Calls",
+      "section": "Additional Component Area",
+      "requirement": "List if Available - Not Required to Consider Quick Hits Complete"
+    },
+    {
+      "index": 32,
+      "name": "LD Minutes",
+      "section": "",
+      "requirement": ""
+    },
+    {
+      "index": 33,
+      "name": "LD Cost",
+      "section": "",
+      "requirement": ""
+    },
+    {
+      "index": 34,
+      "name": "Rate",
+      "section": "",
+      "requirement": ""
+    },
+    {
+      "index": 35,
+      "name": "LD Flat Rate",
+      "section": "",
+      "requirement": ""
+    },
+    {
+      "index": 36,
+      "name": "Port Speed",
+      "section": "Circuit Speed Area",
+      "requirement": "Required if Applicable"
+    },
+    {
+      "index": 37,
+      "name": "Access Speed",
+      "section": "",
+      "requirement": "Required if Applicable"
+    },
+    {
+      "index": 38,
+      "name": "Upload Speed",
+      "section": "",
+      "requirement": ""
+    },
+    {
+      "index": 39,
+      "name": "Z Address 1",
+      "section": "",
+      "requirement": ""
+    },
+    {
+      "index": 40,
+      "name": "Z Address 2",
+      "section": "",
+      "requirement": ""
+    },
+    {
+      "index": 41,
+      "name": "Z City",
+      "section": "",
+      "requirement": ""
+    },
+    {
+      "index": 42,
+      "name": "Z State",
+      "section": "",
+      "requirement": ""
+    },
+    {
+      "index": 43,
+      "name": "Z Zip Code",
+      "section": "",
+      "requirement": ""
+    },
+    {
+      "index": 44,
+      "name": "Z Country",
+      "section": "",
+      "requirement": ""
+    },
+    {
+      "index": 45,
+      "name": "*Contract - Term Months",
+      "section": "CONTRACT AREA",
+      "requirement": "Required for Ticket Closure"
+    },
+    {
+      "index": 46,
+      "name": "*Contract - Begin Date",
+      "section": "",
+      "requirement": ""
+    },
+    {
+      "index": 47,
+      "name": "*Contract - Expiration Date",
+      "section": "",
+      "requirement": ""
+    },
+    {
+      "index": 48,
+      "name": "*Currently Month-to-Month",
+      "section": "",
+      "requirement": "Required for Ticket Closure"
+    },
+    {
+      "index": 49,
+      "name": "Month to Month or Less Than a Year Remaining",
+      "section": "",
+      "requirement": "Required for Ticket Closure"
+    },
+    {
+      "index": 50,
+      "name": "Contract File Name",
+      "section": "",
+      "requirement": "RXqXXrXd fXr TXckXt ClXsXrX"
+    },
+    {
+      "index": 51,
+      "name": "Contract Number",
+      "section": "",
+      "requirement": "Only Used as Needed"
+    },
+    {
+      "index": 52,
+      "name": "2nd Contract Number",
+      "section": "",
+      "requirement": "Only Used as Needed"
+    },
+    {
+      "index": 53,
+      "name": "*Auto Renew",
+      "section": "",
+      "requirement": "Required for Ticket Closure"
+    },
+    {
+      "index": 54,
+      "name": "Auto Renewal Notes and Removal Requirements",
+      "section": "",
+      "requirement": "Only Used as Needed"
+    }
+  ],
+  "dropdowns": {
+    "New Motor Service Type": [
+      "Account Level",
+      "Analog Circuits",
+      "Audit",
+      "Broadband",
+      "Calling Card",
+      "CDN",
+      "Cellular",
+      "Centrex",
+      "Cloud Direct Connection",
+      "CO Muxed T1",
+      "Collocation",
+      "Conferencing",
+      "CPE",
+      "DaaS",
+      "Dark Fiber",
+      "Data Voice Bundled",
+      "DIA",
+      "Dial Up Internet",
+      "DID",
+      "DID Trunks",
+      "DRaaS",
+      "DS1",
+      "DS3",
+      "DSL",
+      "E911",
+      "Electronic Fax",
+      "Ethernet",
+      "Hosted VOIP",
+      "Integrated Circuit",
+      "Inventory Creation",
+      "ISDN BRI",
+      "ISDN PRI",
+      "Listing",
+      "Local Usage",
+      "Long Distance",
+      "MPLS",
+      "NET MGMT",
+      "PBX/Biz Trunks",
+      "Point to Point",
+      "POTS",
+      "RCF",
+      "SDWAN",
+      "SIP Trunk",
+      "Sonet",
+      "Telecom Management",
+      "Telecom Project Management",
+      "TF - Dedicated",
+      "TF - Switched",
+      "TV",
+      "UCaaS",
+      "Usage",
+      "Virus Protection",
+      "Voice Mail",
+      "VOIP DID",
+      "VOIP Line",
+      "VPLS",
+      "VPN",
+      "VTN",
+      "Wireless Cellular Internet",
+      "Wireless DIA",
+      "ABN",
+      "AVTS",
+      "Branch Office Extension (BOE)",
+      "Cable Internet",
+      "Cloud Storage",
+      "Completelink",
+      "DIA-Managed",
+      "DIA-Unmanaged",
+      "FIOS",
+      "Foreign Exchange",
+      "Hosting",
+      "Integrated T1",
+      "IP/Flex",
+      "LD - Dedicated",
+      "LD - Switched",
+      "Managed Network Services",
+      "MDA",
+      "MPLS-Managed",
+      "MPLS-Unmanaged",
+      "P2P Interstate",
+      "P2P Intrastate",
+      "P2P Metro",
+      "Payphone",
+      "TEM - Enhanced",
+      "Uverse",
+      "Wireless Internet"
+    ],
+    "Notes": [
+      "Keep this for unknowns/Unable to confirm",
+      "To be used if no designation of MPLS or Internet can be discerned and Ethernet verbiage is used by the carrier.",
+      "Hosted voip is only Cloud IP-PBX.",
+      "Dynamic IP",
+      "Keep MPLS, use MPLS for VPLS, IPVPN & MPLS service types",
+      "Concurrent Call Paths w/ any number of DIDs. Used with a phone system like a Cisco Call Manager. IP Flex is another example",
+      "Ideally we can inventory useage as part of a particular service. In some cases the carrier information only indicates it is usage without enough information to correlate it to a specific number. In other cases it might not be a good use of time to correlate every penny of usage to a specific number. Type of useage can be defined in the Component or Feature Name column.",
+      "N/A for 2024",
+      "N/A for 2024",
+      "Duplicate of VTN",
+      "1::1 phone num/ CCP; no phone system required",
+      "Bought in builk to run over MPLS, Ethernet, IP VPN",
+      "Cradlepoint",
+      "Use for Fixed wireless, not Cradle points"
+    ],
+    "Status": [
+      "Complete",
+      "Withdrawn",
+      "Pending",
+      "Partially Obtained"
+    ],
+    "Status Explanation": [
+      "Used when all possible information is obtained",
+      "Used when the invoice provided is not applicable to our needs",
+      "Used when we are working to obtain carrier information or finalize",
+      "Used when DD decides we will no longer pursue the missing information"
+    ],
+    "Charge Type": [
+      "MRC",
+      "NRC",
+      "OCC",
+      "Prorated Charges",
+      "Surcharge",
+      "Taxes",
+      "Usage"
+    ],
+    "Charge Type Explanation": [
+      "Monthly reoccuring charges",
+      "Non reoccuring charges",
+      "Other credit and charges",
+      "Self explanatory",
+      "Self explanatory",
+      "Self explanatory",
+      "Self explanatory"
+    ],
+    "Service or Component Options": [
+      "S",
+      "C",
+      "U",
+      "T\\S\\OCC"
+    ],
+    "Service or Component Options Explained": [
+      "Used to show the cost of the service in totality without taxes, sucharges, other credits\\charges.",
+      "Used to show the components that make up the S record.",
+      "Usage fees.",
+      "Taxes, Surcharges, Other Credit and Charges"
+    ],
+    "Currently Month-to-Month": [
+      "Yes",
+      "No"
+    ]
+  },
+  "explanations": {
+    "Status": "Complete it all information is obtained the record is complete.\nPending if all information is not obtained and\\or building the inventory is ongoing.",
+    "Inventory creation questions, concerns, or notes.": "Used to show what the inventory is still missing or other helpful information.",
+    "*Contract Info received": "Contract information and the actual documents is hard to obtain. This column refers to the current status of the work to obtain this information.",
+    "Invoice File Name": "The exact name of the invoice file the inventory is based on.",
+    "Files Used For Inventory": "The exact name of any other files used to build the inventory besides the invoice.",
+    "Service Type": "See Dropdown tab for the Service Types we use.",
+    "Service Type 2": "If we feel additional Service Type information is helpful, we show here."
+  },
+  "checklist": [
+    "Check whether S record missing  and only C record is entered for a service",
+    "Loc Z addresses",
+    "Sub total mismatch - S record total to match with the C records",
+    "Service Address Not Available, check with source file once",
+    "Reconcile the  total with Monthly report / invoice",
+    "Service address normalization along with zip to be done",
+    "One TN with 2 service types to be  checked through pivot",
+    "1SXWE Usoc  service type to be centrex (applicable for Verizon vendor)",
+    "DID in Service type 2 & Primary service  in service type1",
+    "Bandwidth should be captured on both S & C record .  The Access and Upload speed would be Symmetrical in case of Ethernet , MPLS, DIA and Optical Circuit, DS1, DS3",
+    "Account level charges to be captured in inventory",
+    "Account/ Sub Acct/ BTN/ Carrier acts to be validated with source file",
+    "Billing Names should not be blank",
+    "Zero line POTS charges.",
+    "Additional items details to be updated from CSR's",
+    "Formatting of $ in Monthly cost & Cost each",
+    "Formatting of Excel file to be uniform across",
+    "Phone Number Format should be special",
+    "Inventory notes to be validated  for anything missing/TBD",
+    "If TBD, add details in service type 2 for further research for DD1",
+    "3 Addresses - 3rd address to be mentioned in service type 2 (incase found any can be  flagged)",
+    "Fill all blanks with \"No Fill\" (Applicable for NYC for now, incase of Vendor-Verizon)",
+    "Ethernet service should have Access & Upload speed",
+    "Dark Fiber can be completed without Bandwidth",
+    "Recheck for blanks. If anything missing it cannot be tagged as inventory complete",
+    "Check for one circuit billing in 2 accounts and update service type 2",
+    "For RJ21X description we can use Inside Wiring for Service Type (If Applicable)",
+    "For Entrance Bridge, Additional item use \" Conferencing\" as service type",
+    "For all Managed security and Managed services use \" Managed Services\" as the service type",
+    "The AT&T HSI services are always Month to Month"
+  ],
+  "sheets": [
+    "Baseline",
+    "Columns Explained if Needed",
+    "Dropdowns",
+    "Empty Template",
+    "Removed Options",
+    "Instructions ",
+    "Account Tracking",
+    "hiddenSheet",
+    " Checklist",
+    "TF, DID"
+  ]
+}

@@ -129,22 +129,50 @@ def normalize_zip(zip_code: Optional[str]) -> Optional[str]:
 
 
 def normalize_address(address: Optional[str]) -> Optional[str]:
-    """Normalize address for consistent formatting."""
+    """Normalize address to title case for consistent formatting.
+
+    Converts UPPERCASE addresses (e.g., "400 MINUTEMAN RD") to title case
+    ("400 Minuteman Rd") to match reference data formatting.
+    Preserves special patterns like suite/unit numbers and directional prefixes.
+    """
     if not address:
         return address
     addr = address.strip()
-    # Capitalize each word
+    if not addr:
+        return addr
+
+    # Skip non-address values
+    if addr.lower().startswith("service not address"):
+        return addr
+
+    # Convert to title case
     addr = addr.title()
-    # Common abbreviations
-    replacements = {
-        " St ": " St ",
-        " Ave ": " Ave ",
-        " Rd ": " Rd ",
-        " Dr ": " Dr ",
-        " Blvd ": " Blvd ",
-        " Pkwy ": " Pkwy ",
-        " Tpke ": " Tpke ",
+
+    # Fix common abbreviations that should stay abbreviated (not fully capitalized)
+    # These are already correct from .title() — e.g., "St" not "ST"
+    # Fix directional abbreviations that should stay uppercase
+    _DIRECTIONAL = {
+        " Ne ": " NE ", " Nw ": " NW ", " Se ": " SE ", " Sw ": " SW ",
+        " Ne,": " NE,", " Nw,": " NW,", " Se,": " SE,", " Sw,": " SW,",
     }
-    for old, new in replacements.items():
+    for old, new in _DIRECTIONAL.items():
         addr = addr.replace(old, new)
+
+    # Fix ordinal suffixes that title() mangles: "1St" → "1st", "2Nd" → "2nd"
+    addr = re.sub(r'(\d)(St|Nd|Rd|Th)\b', lambda m: m.group(1) + m.group(2).lower(), addr)
+
     return addr
+
+
+def normalize_city(city: Optional[str]) -> Optional[str]:
+    """Normalize city name to title case.
+
+    Converts UPPERCASE city names (e.g., "BUFFALO") to title case ("Buffalo")
+    to match reference data formatting.
+    """
+    if not city:
+        return city
+    c = city.strip()
+    if not c:
+        return c
+    return c.title()

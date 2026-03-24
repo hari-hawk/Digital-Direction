@@ -107,6 +107,7 @@ export default function Dashboard() {
       )}
 
       {/* Row 1: Stats Cards + Health Score */}
+      {!isEmpty && (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         <Card className="bg-zinc-900 border-zinc-800">
           <CardHeader className="pb-2"><CardTitle className="text-xs text-zinc-400">Total Monthly Spend</CardTitle></CardHeader>
@@ -138,9 +139,10 @@ export default function Dashboard() {
           </Card>
         )}
       </div>
+      )}
 
       {/* Row 2: Data Quality + Contract Expiry + M2M */}
-      {enhanced && (
+      {enhanced && !isEmpty && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
           {/* Data Quality Heatmap */}
           <Card className="bg-zinc-900 border-zinc-800">
@@ -235,7 +237,7 @@ export default function Dashboard() {
       )}
 
       {/* Row 3: Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      {!isEmpty && <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <Card className="bg-zinc-900 border-zinc-800">
           <CardHeader><CardTitle className="text-sm text-zinc-400">Monthly Spend by Carrier (Top 10)</CardTitle></CardHeader>
           <CardContent>
@@ -264,10 +266,10 @@ export default function Dashboard() {
             </ResponsiveContainer>
           </CardContent>
         </Card>
-      </div>
+      </div>}
 
       {/* Row 4: Cost by Service Type + Top Locations */}
-      {enhanced && (
+      {enhanced && !isEmpty && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           {/* Cost by Service Type */}
           <Card className="bg-zinc-900 border-zinc-800">
@@ -316,7 +318,7 @@ export default function Dashboard() {
       )}
 
       {/* Row 5: Carrier Summary Table */}
-      <Card className="bg-zinc-900 border-zinc-800">
+      {!isEmpty && <Card className="bg-zinc-900 border-zinc-800">
         <CardHeader><CardTitle className="text-sm text-zinc-400">Carrier Summary</CardTitle></CardHeader>
         <CardContent>
           <table className="w-full text-sm">
@@ -353,7 +355,7 @@ export default function Dashboard() {
             </tbody>
           </table>
         </CardContent>
-      </Card>
+      </Card>}
     </div>
   );
 }

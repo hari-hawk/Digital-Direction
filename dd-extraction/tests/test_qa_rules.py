@@ -24,7 +24,7 @@ def _make_row(**kwargs) -> InventoryRow:
         "service_or_component": "S",
         "charge_type": "MRC",
         "billing_name": "TEST",
-        "service_address_1": "123 Main St",
+        "service_address": "123 Main St",
         "city": "Albany",
         "state": "NY",
         "zip_code": "12345",

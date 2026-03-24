@@ -727,7 +727,7 @@ class GenericCarrierExtractor(CarrierExtractor):
                     carrier_account_number=main_account if parent == main_account else acct,
                     sub_account_number=acct if acct != main_account else None,
                     billing_name=name,
-                    service_address_1=addr.title() if addr else None,
+                    service_address=addr.title() if addr else None,
                     city=city.title() if city else None,
                     state=state.upper() if state else None,
                     zip_code=zip_code,
@@ -736,8 +736,6 @@ class GenericCarrierExtractor(CarrierExtractor):
                     service_or_component="S",
                     charge_type="MRC",
                     quantity=1.0,
-                    conversion_rate=1.0,
-                    currency="USD",
                 )
 
                 if s_mrc is not None and len(site_service_types) > 0:
@@ -776,7 +774,7 @@ class GenericCarrierExtractor(CarrierExtractor):
                     carrier_account_number=main_account if parent == main_account else acct,
                     sub_account_number=acct if acct != main_account else None,
                     billing_name=name,
-                    service_address_1=addr.title() if addr else None,
+                    service_address=addr.title() if addr else None,
                     city=city.title() if city else None,
                     state=state.upper() if state else None,
                     zip_code=zip_code,
@@ -786,8 +784,6 @@ class GenericCarrierExtractor(CarrierExtractor):
                     component_or_feature_name=ct,
                     charge_type="MRC",
                     quantity=1.0,
-                    conversion_rate=1.0,
-                    currency="USD",
                 )
 
                 # Look up MRC for this component
@@ -831,7 +827,7 @@ class GenericCarrierExtractor(CarrierExtractor):
                 carrier_account_number=main_account,
                 sub_account_number=acct if acct else None,
                 billing_name=name_val if name_val else None,
-                service_address_1=addr if addr else None,
+                service_address=addr if addr else None,
                 city=city_val if city_val else None,
                 state=state_val if state_val else None,
                 zip_code=zip_val,
@@ -842,8 +838,6 @@ class GenericCarrierExtractor(CarrierExtractor):
                 phone_number=tn,
                 charge_type="MRC",
                 quantity=1.0,
-                conversion_rate=1.0,
-                currency="USD",
             )
             rows.append(cell_row)
 
@@ -1155,11 +1149,8 @@ class GenericCarrierExtractor(CarrierExtractor):
                         service_or_component="S",
                         monthly_recurring_cost=total_mrc if total_mrc else None,
                         cost_per_unit=total_mrc if total_mrc else None,
-                        mrc_per_currency=total_mrc if total_mrc else None,
                         charge_type="MRC",
                         quantity=1.0,
-                        conversion_rate=1.0,
-                        currency="USD",
                         linkage_key=f"WS_EXTRA_{extra_acct}_{tn}",
                     )
                     rows.append(s_row)
@@ -1243,7 +1234,7 @@ class GenericCarrierExtractor(CarrierExtractor):
                     carrier_account_number=main_account,
                     sub_account_number=acct,
                     billing_name=name if name else None,
-                    service_address_1=addr if addr else None,
+                    service_address=addr if addr else None,
                     city=city_val if city_val else None,
                     state=state_val if state_val else None,
                     zip_code=zip_val,
@@ -1252,11 +1243,8 @@ class GenericCarrierExtractor(CarrierExtractor):
                     service_or_component="S",
                     monthly_recurring_cost=total_mrc if total_mrc else None,
                     cost_per_unit=total_mrc if total_mrc else None,
-                    mrc_per_currency=total_mrc if total_mrc else None,
                     charge_type="MRC",
                     quantity=1.0,
-                    conversion_rate=1.0,
-                    currency="USD",
                     linkage_key=f"WS_MRC_{acct}_{stype}",
                 )
                 rows.append(s_row)
@@ -1279,7 +1267,7 @@ class GenericCarrierExtractor(CarrierExtractor):
                         carrier_account_number=main_account,
                         sub_account_number=acct,
                         billing_name=name if name else None,
-                        service_address_1=addr if addr else None,
+                        service_address=addr if addr else None,
                         city=city_val if city_val else None,
                         state=state_val if state_val else None,
                         zip_code=zip_val,
@@ -1289,11 +1277,8 @@ class GenericCarrierExtractor(CarrierExtractor):
                         component_or_feature_name=comp_name,
                         monthly_recurring_cost=float(cost) if cost and pd.notna(cost) else None,
                         cost_per_unit=float(cost) if cost and pd.notna(cost) else None,
-                        mrc_per_currency=float(cost) if cost and pd.notna(cost) else None,
                         charge_type="MRC",
                         quantity=float(qty) if qty and pd.notna(qty) else 1.0,
-                        conversion_rate=1.0,
-                        currency="USD",
                         linkage_key=f"WS_MRC_{acct}_{stype}",
                     )
                     rows.append(c_row)
@@ -1333,7 +1318,7 @@ class GenericCarrierExtractor(CarrierExtractor):
                 carrier_account_number=main_account,
                 sub_account_number=acct,
                 billing_name=name if name else None,
-                service_address_1=addr if addr else None,
+                service_address=addr if addr else None,
                 city=city_val if city_val else None,
                 state=state_val if state_val else None,
                 zip_code=zip_val,
@@ -1342,8 +1327,6 @@ class GenericCarrierExtractor(CarrierExtractor):
                 service_or_component="S",
                 charge_type="MRC",
                 quantity=1.0,
-                conversion_rate=1.0,
-                currency="USD",
                 linkage_key=f"WS_SvcLoc_{acct}",
             )
 
@@ -1392,7 +1375,7 @@ class GenericCarrierExtractor(CarrierExtractor):
                     carrier_account_number=main_account,
                     sub_account_number=acct,
                     billing_name=name if name else None,
-                    service_address_1=addr_parts.get("service_address_1"),
+                    service_address=addr_parts.get("service_address_1"),
                     city=addr_parts.get("city"),
                     state=addr_parts.get("state"),
                     zip_code=_normalize_zip(addr_parts.get("zip_code")),
@@ -1402,8 +1385,6 @@ class GenericCarrierExtractor(CarrierExtractor):
                     phone_number=tn,
                     charge_type="MRC",
                     quantity=1.0,
-                    conversion_rate=1.0,
-                    currency="USD",
                     linkage_key=f"WS_TN_{acct}",
                 )
                 rows.append(c_row)
@@ -1664,7 +1645,7 @@ class GenericCarrierExtractor(CarrierExtractor):
                 carrier_account_number=main_account,
                 sub_account_number=acct if acct != main_account else None,
                 billing_name=location if location else None,
-                service_address_1=addr1,
+                service_address=addr1,
                 city=city_val,
                 state=state_val,
                 zip_code=zip_val,
@@ -1673,11 +1654,8 @@ class GenericCarrierExtractor(CarrierExtractor):
                 service_or_component="S",
                 monthly_recurring_cost=total_mrc if total_mrc else None,
                 cost_per_unit=total_mrc if total_mrc else None,
-                mrc_per_currency=total_mrc if total_mrc else None,
                 charge_type="MRC",
                 quantity=1.0,
-                conversion_rate=1.0,
-                currency="USD",
                 phone_number=lg["tns"][0] if lg["tns"] else None,
             )
             s_row.linkage_key = f"GR_{acct}_{location}"
@@ -1694,7 +1672,7 @@ class GenericCarrierExtractor(CarrierExtractor):
                     carrier_account_number=main_account,
                     sub_account_number=acct if acct != main_account else None,
                     billing_name=location if location else None,
-                    service_address_1=addr1,
+                    service_address=addr1,
                     city=city_val,
                     state=state_val,
                     zip_code=zip_val,
@@ -1704,11 +1682,8 @@ class GenericCarrierExtractor(CarrierExtractor):
                     component_or_feature_name=charge["description"],
                     monthly_recurring_cost=charge["amount"],
                     cost_per_unit=charge["amount"],
-                    mrc_per_currency=charge["amount"],
                     charge_type="MRC",
                     quantity=charge["quantity"],
-                    conversion_rate=1.0,
-                    currency="USD",
                     usoc=charge["charge_code"] if charge["charge_code"] else None,
                     phone_number=lg["tns"][0] if lg["tns"] else None,
                 )
@@ -1723,7 +1698,7 @@ class GenericCarrierExtractor(CarrierExtractor):
                     carrier_account_number=main_account,
                     sub_account_number=acct if acct != main_account else None,
                     billing_name=location if location else None,
-                    service_address_1=addr1,
+                    service_address=addr1,
                     city=city_val,
                     state=state_val,
                     zip_code=zip_val,
@@ -1733,11 +1708,8 @@ class GenericCarrierExtractor(CarrierExtractor):
                     component_or_feature_name=charge["description"],
                     monthly_recurring_cost=charge["amount"],
                     cost_per_unit=charge["amount"],
-                    mrc_per_currency=charge["amount"],
                     charge_type=charge["charge_type"],
                     quantity=1.0,
-                    conversion_rate=1.0,
-                    currency="USD",
                 )
                 t_row.linkage_key = f"GR_{acct}_{location}"
                 rows.append(t_row)
@@ -1750,7 +1722,7 @@ class GenericCarrierExtractor(CarrierExtractor):
                     carrier_account_number=main_account,
                     sub_account_number=acct if acct != main_account else None,
                     billing_name=location if location else None,
-                    service_address_1=addr1,
+                    service_address=addr1,
                     city=city_val,
                     state=state_val,
                     zip_code=zip_val,
@@ -1761,8 +1733,6 @@ class GenericCarrierExtractor(CarrierExtractor):
                     monthly_recurring_cost=charge["amount"],
                     charge_type="Usage",
                     quantity=1.0,
-                    conversion_rate=1.0,
-                    currency="USD",
                 )
                 u_row.linkage_key = f"GR_{acct}_{location}"
                 rows.append(u_row)
@@ -1793,8 +1763,6 @@ class GenericCarrierExtractor(CarrierExtractor):
                 ld_cost=float(cost) if pd.notna(cost) else None,
                 charge_type="Usage",
                 quantity=1.0,
-                conversion_rate=1.0,
-                currency="USD",
             )
             rows.append(u_row)
 
@@ -1946,7 +1914,7 @@ class GenericCarrierExtractor(CarrierExtractor):
                 carrier=self._carrier_name,
                 carrier_account_number=acct,
                 billing_name=name,
-                service_address_1=addr1 if addr1 else None,
+                service_address=addr1 if addr1 else None,
                 service_address_2=addr2 if addr2 else None,
                 city=city_val if city_val else None,
                 state=state_val if state_val else None,
@@ -1957,8 +1925,6 @@ class GenericCarrierExtractor(CarrierExtractor):
                 carrier_circuit_number=svc_id if svc_id else None,
                 charge_type="MRC",
                 quantity=1.0,
-                conversion_rate=1.0,
-                currency="USD",
             )
             s_row.linkage_key = f"CON_{acct}_{svc_id}"
             rows.append(s_row)
@@ -1970,7 +1936,7 @@ class GenericCarrierExtractor(CarrierExtractor):
                     carrier=self._carrier_name,
                     carrier_account_number=acct,
                     billing_name=name,
-                    service_address_1=addr1 if addr1 else None,
+                    service_address=addr1 if addr1 else None,
                     service_address_2=addr2 if addr2 else None,
                     city=city_val if city_val else None,
                     state=state_val if state_val else None,
@@ -1982,8 +1948,6 @@ class GenericCarrierExtractor(CarrierExtractor):
                     carrier_circuit_number=svc_id if svc_id else None,
                     charge_type="MRC",
                     quantity=1.0,
-                    conversion_rate=1.0,
-                    currency="USD",
                 )
                 c_row.linkage_key = f"CON_{acct}_{svc_id}"
                 rows.append(c_row)
@@ -2012,7 +1976,7 @@ class GenericCarrierExtractor(CarrierExtractor):
                 carrier=self._carrier_name,
                 carrier_account_number=acct,
                 billing_name=name if name else None,
-                service_address_1=full_addr if full_addr else None,
+                service_address=full_addr if full_addr else None,
                 city=city_val if city_val else None,
                 state=state_val if state_val else None,
                 zip_code=zip_val,
@@ -2022,8 +1986,6 @@ class GenericCarrierExtractor(CarrierExtractor):
                 phone_number=phone if phone and phone != "None" else None,
                 charge_type="MRC",
                 quantity=1.0,
-                conversion_rate=1.0,
-                currency="USD",
             )
             s_row.linkage_key = f"CON_{acct}_{phone}"
             rows.append(s_row)
@@ -2106,7 +2068,7 @@ class GenericCarrierExtractor(CarrierExtractor):
                 carrier=self._carrier_name,
                 carrier_account_number=main_account,
                 billing_name=location if location and location != "--" else "Tops Markets, LLC",
-                service_address_1="Service Not Address Specific",
+                service_address="Service Not Address Specific",
                 city="Service Not Address Specific",
                 state=None,
                 zip_code=None,
@@ -2116,11 +2078,8 @@ class GenericCarrierExtractor(CarrierExtractor):
                 component_or_feature_name=desc if desc else svc_name,
                 monthly_recurring_cost=amount,
                 cost_per_unit=amount,
-                mrc_per_currency=amount,
                 charge_type="MRC",
                 quantity=qty,
-                conversion_rate=1.0,
-                currency="USD",
             )
 
             # Contract dates
@@ -2155,7 +2114,7 @@ class GenericCarrierExtractor(CarrierExtractor):
                     carrier=self._carrier_name,
                     carrier_account_number=main_account,
                     billing_name=dest if dest else "Tops Markets, LLC",
-                    service_address_1="Service Not Address Specific",
+                    service_address="Service Not Address Specific",
                     city="Service Not Address Specific",
                     country="USA",
                     service_type="SIP Trunk",
@@ -2163,8 +2122,6 @@ class GenericCarrierExtractor(CarrierExtractor):
                     phone_number=did,
                     charge_type="MRC",
                     quantity=1.0,
-                    conversion_rate=1.0,
-                    currency="USD",
                 )
                 rows.append(u_row)
 
@@ -2220,8 +2177,6 @@ class GenericCarrierExtractor(CarrierExtractor):
                 phone_number=phone if phone and phone != "nan" else None,
                 charge_type="MRC",
                 quantity=1.0,
-                conversion_rate=1.0,
-                currency="USD",
             )
 
             if eff_date and str(eff_date) != "None" and str(eff_date) != "nan":
@@ -2248,8 +2203,6 @@ class GenericCarrierExtractor(CarrierExtractor):
                     monthly_recurring_cost=total_usage,
                     charge_type="Usage",
                     quantity=1.0,
-                    conversion_rate=1.0,
-                    currency="USD",
                 )
                 rows.append(u_row)
 
@@ -2298,8 +2251,6 @@ class GenericCarrierExtractor(CarrierExtractor):
                 service_or_component="S",
                 charge_type="MRC",
                 quantity=1.0,
-                conversion_rate=1.0,
-                currency="USD",
             )
             rows.append(s_row)
 
@@ -2317,8 +2268,6 @@ class GenericCarrierExtractor(CarrierExtractor):
                         component_or_feature_name=phone["name"],
                         charge_type="MRC",
                         quantity=1.0,
-                        conversion_rate=1.0,
-                        currency="USD",
                     )
                     rows.append(u_row)
 
@@ -2419,8 +2368,6 @@ class GenericCarrierExtractor(CarrierExtractor):
             service_or_component="S",
             charge_type="MRC",
             quantity=1.0,
-            conversion_rate=1.0,
-            currency="USD",
         )
 
         if self._carrier_account_number:

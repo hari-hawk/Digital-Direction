@@ -207,3 +207,137 @@ def normalize_service_type(service_type: str, carrier_key: str = "") -> str:
 
     # 5. Return original (trimmed)
     return st
+
+
+# ---------------------------------------------------------------------------
+# Valid dropdown values from the DD platform template
+# These are the ONLY values accepted in the Service Type column.
+# ---------------------------------------------------------------------------
+
+VALID_SERVICE_TYPES = {
+    "Account Level", "Analog Circuits", "Audit", "Broadband", "Calling Card",
+    "CDN", "Cellular", "Centrex", "Cloud Direct Connection", "CO Muxed T1",
+    "Collocation", "Conferencing", "CPE", "DaaS", "Dark Fiber",
+    "Data Voice Bundled", "DIA", "Dial Up Internet", "DID", "DID Trunks",
+    "DRaaS", "DS1", "DS3", "DSL", "E911", "Electronic Fax", "Ethernet",
+    "Hosted VOIP", "Integrated Circuit", "Inventory Creation", "ISDN BRI",
+    "ISDN PRI", "Listing", "Local Usage", "Long Distance", "MPLS",
+    "NET MGMT", "PBX/Biz Trunks", "Point to Point", "POTS", "RCF",
+    "SDWAN", "SIP Trunk", "Sonet", "Telecom Management",
+    "Telecom Project Management", "TF - Dedicated", "TF - Switched", "TV",
+    "UCaaS", "Usage", "Virus Protection", "Voice Mail", "VOIP DID",
+    "VOIP Line", "VPLS", "VPN", "VTN", "Wireless Cellular Internet",
+    "Wireless DIA", "ABN", "AVTS", "Branch Office Extension (BOE)",
+    "Cable Internet", "Cloud Storage", "Completelink", "DIA-Managed",
+    "DIA-Unmanaged", "FIOS", "Foreign Exchange", "Hosting", "Integrated T1",
+    "IP/Flex", "LD - Dedicated", "LD - Switched", "Managed Network Services",
+    "MDA", "MPLS-Managed", "MPLS-Unmanaged", "P2P Interstate",
+    "P2P Intrastate", "P2P Metro", "Payphone", "TEM - Enhanced", "Uverse",
+    "Wireless Internet",
+}
+
+# Case-insensitive lookup for fast matching
+_VALID_SERVICE_TYPES_LOWER = {v.lower(): v for v in VALID_SERVICE_TYPES}
+
+# Fuzzy mapping: non-standard values that should normalize to a valid dropdown
+SERVICE_TYPE_FUZZY_MAP = {
+    "business internet": "Cable Internet",
+    "other": "Inventory Creation",
+    "epl": "Ethernet",
+    "evpl": "Ethernet",
+    "wireless cellular": "Wireless Cellular Internet",
+    "cellular internet": "Cellular",
+    "cellular broadband": "Wireless Cellular Internet",
+    "cellular broadband internet access": "Wireless Cellular Internet",
+    "managed services": "Managed Network Services",
+    "toll free": "TF - Switched",
+    "toll free dedicated": "TF - Dedicated",
+    "toll free switched": "TF - Switched",
+    "hosted voip": "Hosted VOIP",
+    "hosted pbx": "Hosted VOIP",
+    "ip pbx": "Hosted VOIP",
+    "pri": "ISDN PRI",
+    "bri": "ISDN BRI",
+    "point-to-point": "Point to Point",
+    "p2p": "Point to Point",
+    "virtual private network": "VPN",
+    "sd-wan": "SDWAN",
+    "sd wan": "SDWAN",
+}
+
+
+def validate_service_type(service_type: str) -> str:
+    """Validate and normalize service type against the DD platform dropdown.
+
+    If the value is already in the valid set, return as-is.
+    If it matches case-insensitively, return the canonical casing.
+    If it matches a fuzzy alias, return the mapped value.
+    Otherwise return the original (it will still be flagged by QA).
+    """
+    if not service_type:
+        return service_type
+
+    st = service_type.strip()
+
+    # Exact match
+    if st in VALID_SERVICE_TYPES:
+        return st
+
+    # Case-insensitive match
+    canonical = _VALID_SERVICE_TYPES_LOWER.get(st.lower())
+    if canonical:
+        return canonical
+
+    # Fuzzy alias match
+    fuzzy = SERVICE_TYPE_FUZZY_MAP.get(st.lower())
+    if fuzzy:
+        return fuzzy
+
+    # Return original — QA will flag it
+    return st
+
+
+# ---------------------------------------------------------------------------
+# Valid charge types from the DD platform template
+# ---------------------------------------------------------------------------
+
+VALID_CHARGE_TYPES = {"MRC", "NRC", "OCC", "Prorated Charges", "Surcharge", "Taxes", "Usage"}
+
+CHARGE_TYPE_ALIASES = {
+    "mrc": "MRC",
+    "nrc": "NRC",
+    "occ": "OCC",
+    "prorated": "Prorated Charges",
+    "prorated charges": "Prorated Charges",
+    "prorated charge": "Prorated Charges",
+    "pro-rated": "Prorated Charges",
+    "surcharge": "Surcharge",
+    "surcharges": "Surcharge",
+    "taxes": "Taxes",
+    "tax": "Taxes",
+    "usage": "Usage",
+    "use": "Usage",
+}
+
+
+def validate_charge_type(charge_type: str) -> str:
+    """Validate and normalize charge type against the DD platform dropdown.
+
+    Maps common variants (e.g., "ProRated" -> "Prorated Charges") to valid values.
+    """
+    if not charge_type:
+        return charge_type
+
+    ct = charge_type.strip()
+
+    # Exact match
+    if ct in VALID_CHARGE_TYPES:
+        return ct
+
+    # Case-insensitive alias match
+    alias = CHARGE_TYPE_ALIASES.get(ct.lower())
+    if alias:
+        return alias
+
+    # Return original
+    return ct

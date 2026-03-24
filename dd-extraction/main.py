@@ -122,9 +122,11 @@ def run_pipeline(
     row_stats = get_row_stats(result.rows)
     logger.info(f"Row classification: {json.dumps(row_stats)}")
 
-    # --- Stage 2.5: Data Enrichment (ZIP→State, Component, Address defaults) ---
+    # --- Stage 2.5: Data Enrichment (ZIP→State, Component, Address, Service/Charge type validation) ---
     logger.info("\n--- Stage 2.5: Data Enrichment ---")
     from src.extraction.zip_state_lookup import zip_to_state
+    from src.extraction.address_utils import normalize_address, normalize_city
+    from src.extraction.service_type_map import validate_service_type, validate_charge_type
 
     # Experiment 1: ZIP→State lookup
     state_enriched = 0
@@ -154,6 +156,63 @@ def run_pipeline(
             component_enriched += 1
     logger.info(f"Experiment 2 — Component name: {component_enriched} rows enriched")
 
+    # Experiment 3: Address normalization (UPPERCASE → Title Case)
+    addr_normalized = 0
+    city_normalized = 0
+    for row in result.rows:
+        # Normalize service address to title case
+        if row.service_address_1 and row.service_address_1.strip():
+            original = row.service_address_1
+            normalized = normalize_address(original)
+            if normalized != original:
+                row.service_address_1 = normalized
+                addr_normalized += 1
+        # Normalize city to title case
+        if row.city and row.city.strip():
+            original_city = row.city
+            normalized_city = normalize_city(original_city)
+            if normalized_city != original_city:
+                row.city = normalized_city
+                city_normalized += 1
+        # Keep state as 2-letter uppercase (already enforced by ZIP→State)
+        if row.state and row.state.strip():
+            row.state = row.state.strip().upper()
+    logger.info(f"Experiment 3 — Address normalization: {addr_normalized} addresses, {city_normalized} cities title-cased")
+
+    # Experiment 4: Service type validation against DD platform dropdown
+    svc_type_fixed = 0
+    for row in result.rows:
+        if row.service_type and row.service_type.strip():
+            original = row.service_type
+            validated = validate_service_type(original)
+            if validated != original:
+                row.service_type = validated
+                svc_type_fixed += 1
+    logger.info(f"Experiment 4 — Service type validation: {svc_type_fixed} rows normalized to valid dropdown values")
+
+    # Experiment 4b: Charge type validation against DD platform dropdown
+    charge_type_fixed = 0
+    for row in result.rows:
+        if row.charge_type and row.charge_type.strip():
+            original = row.charge_type
+            validated = validate_charge_type(original)
+            if validated != original:
+                row.charge_type = validated
+                charge_type_fixed += 1
+        # For T\S\OCC rows, ensure charge type is Taxes/Surcharge/OCC, not MRC
+        if (row.service_or_component or "") == "T\\S\\OCC" and row.charge_type == "MRC":
+            comp_name = (row.component_or_feature_name or "").lower()
+            if "tax" in comp_name:
+                row.charge_type = "Taxes"
+                charge_type_fixed += 1
+            elif "surcharge" in comp_name or "fee" in comp_name:
+                row.charge_type = "Surcharge"
+                charge_type_fixed += 1
+            else:
+                row.charge_type = "OCC"
+                charge_type_fixed += 1
+    logger.info(f"Experiment 4b — Charge type validation: {charge_type_fixed} rows normalized")
+
     # Experiment 5: Default addresses for carriers with no address data
     def _enrich_carrier_address(carrier_pattern: str, default_addr: str, default_city: str, default_state: str, default_zip: str):
         count = 0
@@ -174,14 +233,26 @@ def run_pipeline(
                 count += 1
         return count
 
-    p_count = _enrich_carrier_address("peerless", "Service Not Address Specific", "BUFFALO", "NY", "14203")
+    p_count = _enrich_carrier_address("peerless", "Service Not Address Specific", "Buffalo", "NY", "14203")
     logger.info(f"Experiment 5a — Peerless addresses: {p_count} fields enriched")
 
-    n_count = _enrich_carrier_address("nextiva", "Service Not Address Specific", "BUFFALO", "NY", "14203")
+    n_count = _enrich_carrier_address("nextiva", "Service Not Address Specific", "Buffalo", "NY", "14203")
     logger.info(f"Experiment 5b — Nextiva addresses: {n_count} fields enriched")
 
-    s_count = _enrich_carrier_address("spectrotel", "Service Not Address Specific", "BUFFALO", "NY", "14203")
+    s_count = _enrich_carrier_address("spectrotel", "Service Not Address Specific", "Buffalo", "NY", "14203")
     logger.info(f"Experiment 5c — Spectrotel addresses: {s_count} fields enriched")
+
+    # Experiment 6: MRC inference — if MRC is missing, try to infer from charge data
+    mrc_inferred = 0
+    for row in result.rows:
+        if row.monthly_recurring_cost is not None:
+            continue
+        # For S rows without MRC, check if cost_per_unit is available
+        if row.cost_per_unit is not None and row.quantity is not None:
+            row.monthly_recurring_cost = round(row.cost_per_unit * row.quantity, 2)
+            row.mrc_per_currency = row.monthly_recurring_cost
+            mrc_inferred += 1
+    logger.info(f"Experiment 6 — MRC inference: {mrc_inferred} rows inferred from cost_per_unit * quantity")
 
     # --- Stage 3: Confidence scoring ---
     logger.info("\n--- Stage 3: Confidence Scoring ---")
@@ -292,6 +363,8 @@ def run_all_carriers(
 
             # Enrichment (same as Stage 2.5 in single-carrier pipeline)
             from src.extraction.zip_state_lookup import zip_to_state
+            from src.extraction.address_utils import normalize_address, normalize_city
+            from src.extraction.service_type_map import validate_service_type, validate_charge_type
             for row in result.rows:
                 # ZIP→State
                 if not (row.state or "").strip():
@@ -308,6 +381,33 @@ def run_all_carriers(
                         row.component_or_feature_name = svc
                     elif svc and scu == "S":
                         row.component_or_feature_name = f"{svc} Service"
+                # Address normalization (UPPERCASE → Title Case)
+                if row.service_address_1 and row.service_address_1.strip():
+                    row.service_address_1 = normalize_address(row.service_address_1)
+                if row.city and row.city.strip():
+                    row.city = normalize_city(row.city)
+                # Keep state as 2-letter uppercase
+                if row.state and row.state.strip():
+                    row.state = row.state.strip().upper()
+                # Service type validation
+                if row.service_type and row.service_type.strip():
+                    row.service_type = validate_service_type(row.service_type)
+                # Charge type validation
+                if row.charge_type and row.charge_type.strip():
+                    row.charge_type = validate_charge_type(row.charge_type)
+                # T\S\OCC charge type correction
+                if (row.service_or_component or "") == "T\\S\\OCC" and row.charge_type == "MRC":
+                    comp_name = (row.component_or_feature_name or "").lower()
+                    if "tax" in comp_name:
+                        row.charge_type = "Taxes"
+                    elif "surcharge" in comp_name or "fee" in comp_name:
+                        row.charge_type = "Surcharge"
+                    else:
+                        row.charge_type = "OCC"
+                # MRC inference from cost_per_unit * quantity
+                if row.monthly_recurring_cost is None and row.cost_per_unit is not None and row.quantity is not None:
+                    row.monthly_recurring_cost = round(row.cost_per_unit * row.quantity, 2)
+                    row.mrc_per_currency = row.monthly_recurring_cost
                 # Default addresses for carriers without address data
                 c = (row.carrier or "").strip().lower()
                 if any(p in c for p in ["peerless", "nextiva", "spectrotel"]):
@@ -318,7 +418,7 @@ def run_all_carriers(
                     if not (row.zip_code or "").strip():
                         row.zip_code = "14203"
                     if not (row.city or "").strip():
-                        row.city = "BUFFALO"
+                        row.city = "Buffalo"
 
             for row in result.rows:
                 row.confidence = score_row_confidence(row)

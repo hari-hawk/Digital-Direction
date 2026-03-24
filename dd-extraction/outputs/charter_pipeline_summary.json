@@ -1,28 +1,28 @@
 {
   "carrier": "Charter Communications",
   "carrier_key": "charter",
-  "total_rows": 1369,
+  "total_rows": 54,
   "row_stats": {
-    "total": 1369,
-    "S": 206,
-    "C": 1163,
+    "total": 54,
+    "S": 51,
+    "C": 3,
     "U": 0,
     "T\\S\\OCC": 0,
     "unclassified": 0
   },
-  "qa_passed": false,
+  "qa_passed": true,
   "qa_summary": {
     "total_rules": 10,
-    "passed": 8,
-    "failed": 2,
+    "passed": 10,
+    "failed": 0,
     "rules": {
       "S-row MRC = sum(C-row MRCs)": {
-        "passed": false,
-        "violations": 23
+        "passed": true,
+        "violations": 0
       },
       "Required columns populated": {
-        "passed": false,
-        "violations": 40
+        "passed": true,
+        "violations": 0
       },
       "Service Type in dropdown": {
         "passed": true,
@@ -59,16 +59,16 @@
     }
   },
   "confidence": {
-    "total_populated_fields": 36111,
-    "high": 16587,
-    "medium": 19209,
-    "low": 315,
-    "high_pct": 45.9,
-    "medium_pct": 53.2,
-    "low_pct": 0.9
+    "total_populated_fields": 1024,
+    "high": 437,
+    "medium": 587,
+    "low": 0,
+    "high_pct": 42.7,
+    "medium_pct": 57.3,
+    "low_pct": 0.0
   },
-  "processing_time_seconds": 3.28,
+  "processing_time_seconds": 1.43,
   "output_file": "outputs/charter_inventory_output.xlsx",
-  "warnings_count": 1,
+  "warnings_count": 2,
   "errors_count": 0
 }

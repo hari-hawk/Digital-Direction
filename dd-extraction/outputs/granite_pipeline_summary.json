@@ -25,8 +25,8 @@
         "violations": 2073
       },
       "Service Type in dropdown": {
-        "passed": false,
-        "violations": 60
+        "passed": true,
+        "violations": 0
       },
       "Charge Type in dropdown": {
         "passed": true,
@@ -49,8 +49,8 @@
         "violations": 0
       },
       "Currency = USD": {
-        "passed": true,
-        "violations": 0
+        "passed": false,
+        "violations": 2012
       },
       "Phone number format": {
         "passed": true,
@@ -59,16 +59,16 @@
     }
   },
   "confidence": {
-    "total_populated_fields": 37020,
-    "high": 14506,
-    "medium": 22514,
+    "total_populated_fields": 39007,
+    "high": 18457,
+    "medium": 20550,
     "low": 0,
-    "high_pct": 39.2,
-    "medium_pct": 60.8,
+    "high_pct": 47.3,
+    "medium_pct": 52.7,
     "low_pct": 0.0
   },
-  "processing_time_seconds": 3.54,
-  "output_file": "/Users/harivershan/Library/CloudStorage/GoogleDrive-hari.sr@techjays.com/My Drive/Digital Direction POC/Claude/Code Agent/dd-extraction/outputs/granite_inventory_output.xlsx",
+  "processing_time_seconds": 3.3,
+  "output_file": "outputs/granite_inventory_output.xlsx",
   "warnings_count": 0,
   "errors_count": 0
 }
