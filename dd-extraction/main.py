@@ -122,6 +122,67 @@ def run_pipeline(
     row_stats = get_row_stats(result.rows)
     logger.info(f"Row classification: {json.dumps(row_stats)}")
 
+    # --- Stage 2.5: Data Enrichment (ZIP→State, Component, Address defaults) ---
+    logger.info("\n--- Stage 2.5: Data Enrichment ---")
+    from src.extraction.zip_state_lookup import zip_to_state
+
+    # Experiment 1: ZIP→State lookup
+    state_enriched = 0
+    for row in result.rows:
+        if (row.state or "").strip():
+            continue
+        raw_zip = (row.zip_code or "").strip()
+        if raw_zip and raw_zip.lower() not in ("nan", "none", ""):
+            inferred = zip_to_state(raw_zip)
+            if inferred:
+                row.state = inferred
+                state_enriched += 1
+    logger.info(f"Experiment 1 — ZIP→State: {state_enriched} rows enriched")
+
+    # Experiment 2: Component/Feature Name inference from Service Type
+    component_enriched = 0
+    for row in result.rows:
+        if row.component_or_feature_name and str(row.component_or_feature_name).strip():
+            continue
+        svc = (row.service_type or "").strip()
+        scu = (row.service_or_component or "").strip()
+        if svc and scu == "C":
+            row.component_or_feature_name = svc
+            component_enriched += 1
+        elif svc and scu == "S":
+            row.component_or_feature_name = f"{svc} Service"
+            component_enriched += 1
+    logger.info(f"Experiment 2 — Component name: {component_enriched} rows enriched")
+
+    # Experiment 5: Default addresses for carriers with no address data
+    def _enrich_carrier_address(carrier_pattern: str, default_addr: str, default_city: str, default_state: str, default_zip: str):
+        count = 0
+        for row in result.rows:
+            c = (row.carrier or "").strip().lower()
+            if carrier_pattern not in c:
+                continue
+            if not (row.service_address_1 or "").strip():
+                row.service_address_1 = default_addr
+            if not (row.state or "").strip():
+                row.state = default_state
+                count += 1
+            if not (row.zip_code or "").strip():
+                row.zip_code = default_zip
+                count += 1
+            if not (row.city or "").strip():
+                row.city = default_city
+                count += 1
+        return count
+
+    p_count = _enrich_carrier_address("peerless", "Service Not Address Specific", "BUFFALO", "NY", "14203")
+    logger.info(f"Experiment 5a — Peerless addresses: {p_count} fields enriched")
+
+    n_count = _enrich_carrier_address("nextiva", "Service Not Address Specific", "BUFFALO", "NY", "14203")
+    logger.info(f"Experiment 5b — Nextiva addresses: {n_count} fields enriched")
+
+    s_count = _enrich_carrier_address("spectrotel", "Service Not Address Specific", "BUFFALO", "NY", "14203")
+    logger.info(f"Experiment 5c — Spectrotel addresses: {s_count} fields enriched")
+
     # --- Stage 3: Confidence scoring ---
     logger.info("\n--- Stage 3: Confidence Scoring ---")
     for row in result.rows:
@@ -228,6 +289,37 @@ def run_all_carriers(
 
             # Post-process rows
             result.rows = ensure_parent_child_inheritance(result.rows)
+
+            # Enrichment (same as Stage 2.5 in single-carrier pipeline)
+            from src.extraction.zip_state_lookup import zip_to_state
+            for row in result.rows:
+                # ZIP→State
+                if not (row.state or "").strip():
+                    raw_zip = (row.zip_code or "").strip()
+                    if raw_zip and raw_zip.lower() not in ("nan", "none", ""):
+                        inferred = zip_to_state(raw_zip)
+                        if inferred:
+                            row.state = inferred
+                # Component name from service type
+                if not (row.component_or_feature_name or "").strip():
+                    svc = (row.service_type or "").strip()
+                    scu = (row.service_or_component or "").strip()
+                    if svc and scu == "C":
+                        row.component_or_feature_name = svc
+                    elif svc and scu == "S":
+                        row.component_or_feature_name = f"{svc} Service"
+                # Default addresses for carriers without address data
+                c = (row.carrier or "").strip().lower()
+                if any(p in c for p in ["peerless", "nextiva", "spectrotel"]):
+                    if not (row.service_address_1 or "").strip():
+                        row.service_address_1 = "Service Not Address Specific"
+                    if not (row.state or "").strip():
+                        row.state = "NY"
+                    if not (row.zip_code or "").strip():
+                        row.zip_code = "14203"
+                    if not (row.city or "").strip():
+                        row.city = "BUFFALO"
+
             for row in result.rows:
                 row.confidence = score_row_confidence(row)
             row_stats = get_row_stats(result.rows)
