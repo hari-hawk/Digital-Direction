@@ -127,7 +127,7 @@ export default function InsightsPage() {
                 <BarChart data={costChartData} layout="vertical" margin={{ left: 100 }}>
                   <XAxis type="number" tickFormatter={(v) => `$${v}`} stroke="#71717a" />
                   <YAxis type="category" dataKey="carrier" width={100} tick={{ fontSize: 11, fill: "#a1a1aa" }} />
-                  <Tooltip formatter={(v: number) => formatMoney(v)} contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: 8 }} />
+                  <Tooltip formatter={(v) => formatMoney(Number(v))} contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: 8 }} />
                   <Bar dataKey="avg" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>

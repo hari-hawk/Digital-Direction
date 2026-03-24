@@ -246,7 +246,6 @@ export default function UploadPage() {
               type="file"
               // @ts-expect-error - webkitdirectory is valid but not in types
               webkitdirectory=""
-              // @ts-expect-error directory is a valid HTML attribute but not in React types
               directory=""
               multiple
               className="hidden"

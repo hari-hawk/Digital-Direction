@@ -245,7 +245,7 @@ export default function Dashboard() {
               <BarChart data={topSpend} layout="vertical" margin={{ left: 120 }}>
                 <XAxis type="number" tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} stroke="#71717a" />
                 <YAxis type="category" dataKey="carrier" width={120} tick={{ fontSize: 11, fill: "#a1a1aa" }} />
-                <Tooltip formatter={(v: number) => formatMoney(v)} contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: 8 }} />
+                <Tooltip formatter={(v) => formatMoney(Number(v))} contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: 8 }} />
                 <Bar dataKey="mrc" fill="#3b82f6" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
@@ -258,7 +258,7 @@ export default function Dashboard() {
             <ResponsiveContainer width="100%" height={300}>
               <PieChart>
                 <Pie data={topServices} dataKey="count" nameKey="service_type" cx="50%" cy="50%" outerRadius={100}
-                  label={({ service_type, count }) => `${service_type} (${count})`}>
+                  label={(props) => `${props.name ?? ''} (${props.value ?? 0})`}>
                   {topServices.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                 </Pie>
                 <Tooltip contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: 8 }} />
