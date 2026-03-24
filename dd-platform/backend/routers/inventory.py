@@ -157,6 +157,7 @@ async def list_inventory(
     charge_type: str = None,
     scu_code: str = None,
     status: str = None,
+    review_status: str = None,
     search: str = None,
     sort_by: str = None,
     sort_dir: str = "asc",
@@ -172,7 +173,8 @@ async def list_inventory(
     file_path = _resolve_file(proj, source)
 
     if sheet.strip() == "Baseline":
-        result = get_inventory_rows(
+        # Load full data with standard filters (no pagination yet)
+        full_result = get_inventory_rows(
             file_path=file_path,
             carrier=carrier,
             service_type=service_type,
@@ -182,17 +184,53 @@ async def list_inventory(
             search=search,
             sort_by=sort_by,
             sort_dir=sort_dir,
-            page=page,
-            page_size=page_size,
+            page=1,
+            page_size=999999,  # Get all rows for accuracy computation
         )
-        # Enrich each row with accuracy, review status, and source files
+
+        # Compute accuracy and review status for EVERY row
         source_files = _get_source_files(proj)
-        for row in result.get("rows", []):
+        all_rows = full_result.get("rows", [])
+        for row in all_rows:
             acc = _compute_row_accuracy(row.get("data", {}))
             row["accuracy"] = acc
-            row["status"] = _get_row_status(project_id, row["row_index"], acc)
+            row_review = _get_row_status(project_id, row["row_index"], acc)
+            row["status"] = row_review
             row["source_files"] = source_files
-        return result
+
+        # Apply review_status filter AFTER accuracy computation
+        if review_status:
+            review_map = {
+                "completed": lambda r: r["accuracy"] >= 90,
+                "need_review": lambda r: 70 <= r["accuracy"] < 90,
+                "critical": lambda r: r["accuracy"] < 70,
+            }
+            filter_fn = review_map.get(review_status)
+            if filter_fn:
+                all_rows = [r for r in all_rows if filter_fn(r)]
+
+        # Apply sorting on accuracy/review if requested
+        if sort_by == "accuracy":
+            all_rows.sort(key=lambda r: r.get("accuracy", 0), reverse=(sort_dir == "desc"))
+        elif sort_by == "review" or sort_by == "status":
+            order = {"critical": 0, "need_review": 1, "in_progress": 2, "completed": 3}
+            if sort_dir == "desc":
+                order = {"completed": 0, "in_progress": 1, "need_review": 2, "critical": 3}
+            all_rows.sort(key=lambda r: order.get(r.get("status", ""), 99))
+
+        # Now paginate
+        total = len(all_rows)
+        start = (page - 1) * page_size
+        end = start + page_size
+        page_rows = all_rows[start:end]
+
+        return {
+            "rows": page_rows,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "columns": full_result.get("columns", []),
+        }
 
     # Generic sheet loading for non-Baseline sheets
     df = _load_sheet_data(file_path, sheet)

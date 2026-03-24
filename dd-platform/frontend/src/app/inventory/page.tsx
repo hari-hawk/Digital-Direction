@@ -26,11 +26,11 @@ const EMPTY_FILTERS: FilterState = {
 };
 
 // Status badge config
-const STATUS_CONFIG: Record<string, { label: string; cls: string }> = {
-  completed: { label: "Completed", cls: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" },
-  need_review: { label: "Need Review", cls: "bg-amber-500/20 text-amber-300 border-amber-500/30" },
-  critical: { label: "Critical", cls: "bg-red-500/20 text-red-300 border-red-500/30" },
-  in_progress: { label: "In Progress", cls: "bg-blue-500/20 text-blue-300 border-blue-500/30" },
+const STATUS_CONFIG: Record<string, { label: string; cls: string; short: string }> = {
+  completed: { label: "High Confidence", short: "Completed", cls: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" },
+  need_review: { label: "Medium Confidence", short: "Need Review", cls: "bg-amber-500/20 text-amber-300 border-amber-500/30" },
+  critical: { label: "Needs Review", short: "Critical", cls: "bg-red-500/20 text-red-300 border-red-500/30" },
+  in_progress: { label: "In Progress", short: "In Progress", cls: "bg-blue-500/20 text-blue-300 border-blue-500/30" },
 };
 
 // Field grouping for the slider detail view
@@ -380,25 +380,16 @@ export default function InventoryPage() {
         if (filters.charge_type) params.charge_type = filters.charge_type;
         if (filters.scu_code) params.scu_code = filters.scu_code;
         if (filters.status) params.status = filters.status;
+        // Send review filter to backend for server-side accuracy filtering
+        if (reviewFilter) params.review_status = reviewFilter;
       }
       if (filters.search) params.search = filters.search;
       if (sort.column) { params.sort_by = sort.column; params.sort_dir = sort.direction; }
       const data = await api.getInventory(projectId, params);
-      let resultRows = data.rows || [];
-
-      // Client-side review filter (filter by accuracy-based status)
-      if (reviewFilter) {
-        resultRows = resultRows.filter((r: Record<string, unknown>) => {
-          const rowStatus = r.status as string || "";
-          if (reviewFilter === "completed") return rowStatus === "completed";
-          if (reviewFilter === "need_review") return rowStatus === "need_review";
-          if (reviewFilter === "critical") return rowStatus === "critical" || (r.accuracy as number || 0) < 70;
-          return true;
-        });
-      }
+      const resultRows = data.rows || [];
 
       setRows(resultRows);
-      setTotal(reviewFilter ? resultRows.length : (data.total || 0));
+      setTotal(data.total || 0);
       if ((data as unknown as Record<string, unknown>).columns) {
         setColumns((data as unknown as Record<string, unknown>).columns as string[]);
       }
@@ -859,9 +850,9 @@ export default function InventoryPage() {
                   <select value={reviewFilter} onChange={(e) => { setReviewFilter(e.target.value); setPage(1); }}
                     className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-sm h-9">
                     <option value="">All Reviews</option>
-                    <option value="completed">✓ Completed (90%+)</option>
-                    <option value="need_review">! Need Review (70-89%)</option>
-                    <option value="critical">✕ Critical (&lt;70%)</option>
+                    <option value="completed">✓ High Confidence (90%+)</option>
+                    <option value="need_review">! Medium Confidence (70-89%)</option>
+                    <option value="critical">✕ Needs Review (&lt;70%)</option>
                   </select>
                 </div>
               </div>
