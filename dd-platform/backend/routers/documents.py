@@ -216,13 +216,18 @@ def _detect_doc_type(file_path: str) -> tuple[str, str]:
                 detected_type = folder_name
                 break
 
-    # Detect carrier from filename patterns
+    # Detect carrier from filename patterns — master list
     common_carriers = [
-        "Charter Communications", "Windstream", "Granite", "Peerless",
-        "Consolidated", "Spectrotel", "Frontier", "Verizon", "Nextiva",
-        "Delhi Telephone", "Champlain", "TDS Telecom", "StateTel",
-        "Directv", "BCN Telecom", "WVT Fiber", "Lumen", "AT&T",
-        "Comcast", "Cox", "CenturyLink",
+        "Allstar Systems", "BCN Telecom", "Champlain Technology",
+        "Charter Communications", "Consolidated Communications", "Crown Castle",
+        "Delhi Telephone Company", "Directv", "FirstLight (Fiber)", "FirstLight",
+        "Frontier", "Granite", "Lumen", "Message Media", "Mid Hudson",
+        "Nextiva", "Peerless Network", "Spectrotel", "StateTel",
+        "TDS Telecom", "T-Mobile", "Verizon Wireless", "Verizon",
+        "Windstream", "WVT Fiber", "Zayo",
+        # Common aliases
+        "Charter", "Peerless", "Consolidated", "Delhi Telephone",
+        "Champlain", "AT&T", "Comcast", "Cox", "CenturyLink",
     ]
     detected_carrier = "Unknown"
     for carrier in common_carriers:

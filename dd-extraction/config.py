@@ -212,7 +212,53 @@ CARRIER_REGISTRY = {
         "tier": 3,
         "extractor": "generic",
     },
+    "t_mobile": {
+        "display_name": "T-Mobile",
+        "invoice_folder": "T-Mobile",
+        "report_folder": "",
+        "contract_folder": "",
+        "tier": 3,
+        "extractor": "generic",
+    },
+    "verizon_wireless": {
+        "display_name": "Verizon Wireless",
+        "invoice_folder": "Verizon Wireless",
+        "report_folder": "",
+        "contract_folder": "",
+        "tier": 3,
+        "extractor": "generic",
+    },
 }
+
+# Master carrier name list — used for auto-detection from filenames, folder names, and data
+# These are the canonical carrier names used across the platform
+MASTER_CARRIER_NAMES = [
+    "Allstar Systems",
+    "BCN Telecom",
+    "Champlain Technology",
+    "Charter Communications",
+    "Consolidated Communications",
+    "Crown Castle",
+    "Delhi Telephone Company",
+    "Directv",
+    "FirstLight (Fiber)",
+    "Frontier",
+    "Granite",
+    "Lumen",
+    "Message Media",
+    "Mid Hudson",
+    "Nextiva",
+    "Peerless Network",
+    "Spectrotel",
+    "StateTel",
+    "TDS Telecom",
+    "T-Mobile",
+    "Verizon",
+    "Verizon Wireless",
+    "Windstream",
+    "WVT Fiber",
+    "Zayo",
+]
 
 # Anthropic API key for OCR (optional - pipeline degrades gracefully without it)
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
