@@ -543,114 +543,89 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      {/* Data Verification Dashboard — Collapsible Accordion */}
+      {/* Data Verification Dashboard */}
       {confidence && confidence.total_rows > 0 && activeSheet === "Baseline" && (
-        <div className="mb-4">
-          {/* Accordion Header — always visible */}
-          <button
-            onClick={() => setConfidenceExpanded(!confidenceExpanded)}
-            className="w-full flex items-center justify-between px-4 py-2.5 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-zinc-700 transition-colors mb-2"
-          >
-            <div className="flex items-center gap-4">
-              <span className="text-sm font-medium text-zinc-300">Data Verification</span>
-              {/* Inline mini-stats — always visible even when collapsed */}
-              <div className="flex items-center gap-3 text-xs">
-                <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  <span className="text-emerald-400 font-mono">{confidence.high.toLocaleString()}</span>
-                  <span className="text-zinc-500">({confidence.high_pct}%)</span>
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-amber-500" />
-                  <span className="text-amber-400 font-mono">{confidence.medium.toLocaleString()}</span>
-                  <span className="text-zinc-500">({confidence.medium_pct}%)</span>
-                </span>
-                <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-red-500" />
-                  <span className="text-red-400 font-mono">{confidence.needs_review.toLocaleString()}</span>
-                  <span className="text-zinc-500">({confidence.needs_review_pct}%)</span>
-                </span>
+        <div className="mb-4 space-y-2">
+          {/* Confidence Cards — ALWAYS VISIBLE, clickable for filtering */}
+          <div className="grid grid-cols-3 gap-2">
+            <button onClick={() => { setReviewFilter(reviewFilter === "completed" ? "" : "completed"); setPage(1); }}
+              className={`p-3 rounded-lg border text-left transition-all ${
+                reviewFilter === "completed" ? "border-emerald-500/50 bg-emerald-950/30 ring-1 ring-emerald-500/20" : "border-emerald-500/20 bg-emerald-950/10 hover:border-emerald-500/30"
+              }`}>
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className="w-4 h-4 rounded-full bg-emerald-500/20 flex items-center justify-center text-[9px] text-emerald-400">✓</span>
+                <span className="text-[10px] font-semibold text-emerald-400 uppercase">High (90%+)</span>
               </div>
-            </div>
-            <span className={`text-zinc-500 transition-transform ${confidenceExpanded ? "rotate-180" : ""}`}>▼</span>
-          </button>
-
-          {/* Accordion Body — collapsible */}
-          {confidenceExpanded && (
-            <div className="space-y-3">
-              {/* Confidence Cards — compact */}
-              <div className="grid grid-cols-3 gap-2">
-                <button onClick={() => { setReviewFilter(reviewFilter === "completed" ? "" : "completed"); setPage(1); }}
-                  className={`p-3 rounded-lg border text-left transition-all ${
-                    reviewFilter === "completed" ? "border-emerald-500/50 bg-emerald-950/30 ring-1 ring-emerald-500/20" : "border-emerald-500/20 bg-emerald-950/10 hover:border-emerald-500/30"
-                  }`}>
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <span className="w-4 h-4 rounded-full bg-emerald-500/20 flex items-center justify-center text-[9px] text-emerald-400">✓</span>
-                    <span className="text-[10px] font-semibold text-emerald-400 uppercase">High (90%+)</span>
-                  </div>
-                  <p className="text-lg font-bold text-emerald-300">{confidence.high.toLocaleString()}</p>
-                  <div className="w-full bg-emerald-900/30 rounded-full h-1 mt-1">
-                    <div className="bg-emerald-500 h-1 rounded-full" style={{ width: `${confidence.high_pct}%` }} />
-                  </div>
-                </button>
-
-                <button onClick={() => { setReviewFilter(reviewFilter === "need_review" ? "" : "need_review"); setPage(1); }}
-                  className={`p-3 rounded-lg border text-left transition-all ${
-                    reviewFilter === "need_review" ? "border-amber-500/50 bg-amber-950/30 ring-1 ring-amber-500/20" : "border-amber-500/20 bg-amber-950/10 hover:border-amber-500/30"
-                  }`}>
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <span className="w-4 h-4 rounded-full bg-amber-500/20 flex items-center justify-center text-[9px] text-amber-400">!</span>
-                    <span className="text-[10px] font-semibold text-amber-400 uppercase">Medium (70-89%)</span>
-                  </div>
-                  <p className="text-lg font-bold text-amber-300">{confidence.medium.toLocaleString()}</p>
-                  <div className="w-full bg-amber-900/30 rounded-full h-1 mt-1">
-                    <div className="bg-amber-500 h-1 rounded-full" style={{ width: `${confidence.medium_pct}%` }} />
-                  </div>
-                </button>
-
-                <button onClick={() => { setReviewFilter(reviewFilter === "critical" ? "" : "critical"); setPage(1); }}
-                  className={`p-3 rounded-lg border text-left transition-all ${
-                    reviewFilter === "critical" ? "border-red-500/50 bg-red-950/30 ring-1 ring-red-500/20" : "border-red-500/20 bg-red-950/10 hover:border-red-500/30"
-                  }`}>
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <span className="w-4 h-4 rounded-full bg-red-500/20 flex items-center justify-center text-[9px] text-red-400">✕</span>
-                    <span className="text-[10px] font-semibold text-red-400 uppercase">Review (&lt;70%)</span>
-                  </div>
-                  <p className="text-lg font-bold text-red-300">{confidence.needs_review.toLocaleString()}</p>
-                  <div className="w-full bg-red-900/30 rounded-full h-1 mt-1">
-                    <div className="bg-red-500 h-1 rounded-full" style={{ width: `${confidence.needs_review_pct}%` }} />
-                  </div>
-                </button>
+              <p className="text-lg font-bold text-emerald-300">{confidence.high.toLocaleString()}</p>
+              <div className="w-full bg-emerald-900/30 rounded-full h-1 mt-1">
+                <div className="bg-emerald-500 h-1 rounded-full" style={{ width: `${confidence.high_pct}%` }} />
               </div>
+            </button>
 
-              {/* Data Source Table — compact */}
-              {confidence.extraction_methods.length > 0 && (
-                <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b border-zinc-800 text-zinc-500 uppercase text-[10px]">
-                        <th className="text-left py-1.5 px-3">Carrier</th>
-                        <th className="text-right py-1.5 px-3">Rows</th>
-                        <th className="text-right py-1.5 px-3">Spend</th>
-                        <th className="text-right py-1.5 px-3">Confidence</th>
+            <button onClick={() => { setReviewFilter(reviewFilter === "need_review" ? "" : "need_review"); setPage(1); }}
+              className={`p-3 rounded-lg border text-left transition-all ${
+                reviewFilter === "need_review" ? "border-amber-500/50 bg-amber-950/30 ring-1 ring-amber-500/20" : "border-amber-500/20 bg-amber-950/10 hover:border-amber-500/30"
+              }`}>
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className="w-4 h-4 rounded-full bg-amber-500/20 flex items-center justify-center text-[9px] text-amber-400">!</span>
+                <span className="text-[10px] font-semibold text-amber-400 uppercase">Medium (70-89%)</span>
+              </div>
+              <p className="text-lg font-bold text-amber-300">{confidence.medium.toLocaleString()}</p>
+              <div className="w-full bg-amber-900/30 rounded-full h-1 mt-1">
+                <div className="bg-amber-500 h-1 rounded-full" style={{ width: `${confidence.medium_pct}%` }} />
+              </div>
+            </button>
+
+            <button onClick={() => { setReviewFilter(reviewFilter === "critical" ? "" : "critical"); setPage(1); }}
+              className={`p-3 rounded-lg border text-left transition-all ${
+                reviewFilter === "critical" ? "border-red-500/50 bg-red-950/30 ring-1 ring-red-500/20" : "border-red-500/20 bg-red-950/10 hover:border-red-500/30"
+              }`}>
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className="w-4 h-4 rounded-full bg-red-500/20 flex items-center justify-center text-[9px] text-red-400">✕</span>
+                <span className="text-[10px] font-semibold text-red-400 uppercase">Review (&lt;70%)</span>
+              </div>
+              <p className="text-lg font-bold text-red-300">{confidence.needs_review.toLocaleString()}</p>
+              <div className="w-full bg-red-900/30 rounded-full h-1 mt-1">
+                <div className="bg-red-500 h-1 rounded-full" style={{ width: `${confidence.needs_review_pct}%` }} />
+              </div>
+            </button>
+          </div>
+
+          {/* Data Source Table — COLLAPSIBLE accordion */}
+          {confidence.extraction_methods.length > 0 && (
+            <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900">
+              <button
+                onClick={() => setConfidenceExpanded(!confidenceExpanded)}
+                className="w-full flex items-center justify-between px-3 py-2 hover:bg-zinc-800/50 transition-colors"
+              >
+                <span className="text-xs font-medium text-zinc-400">Data Source & Confidence</span>
+                <span className={`text-zinc-500 text-xs transition-transform ${confidenceExpanded ? "rotate-180" : ""}`}>▼</span>
+              </button>
+              {confidenceExpanded && (
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-t border-b border-zinc-800 text-zinc-500 uppercase text-[10px]">
+                      <th className="text-left py-1.5 px-3">Carrier</th>
+                      <th className="text-right py-1.5 px-3">Rows</th>
+                      <th className="text-right py-1.5 px-3">Spend</th>
+                      <th className="text-right py-1.5 px-3">Confidence</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {confidence.extraction_methods.map((m) => (
+                      <tr key={m.carrier} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
+                        <td className="py-1 px-3 text-zinc-300">{m.carrier}</td>
+                        <td className="text-right py-1 px-3 text-zinc-400 font-mono">{m.rows.toLocaleString()}</td>
+                        <td className="text-right py-1 px-3 text-zinc-400 font-mono">${m.mrc.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</td>
+                        <td className="text-right py-1 px-3 font-mono">
+                          <span className={m.avg_confidence >= 90 ? "text-emerald-400" : m.avg_confidence >= 70 ? "text-amber-400" : "text-red-400"}>
+                            {m.avg_confidence}%
+                          </span>
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {confidence.extraction_methods.map((m) => (
-                        <tr key={m.carrier} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
-                          <td className="py-1 px-3 text-zinc-300">{m.carrier}</td>
-                          <td className="text-right py-1 px-3 text-zinc-400 font-mono">{m.rows.toLocaleString()}</td>
-                          <td className="text-right py-1 px-3 text-zinc-400 font-mono">${m.mrc.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</td>
-                          <td className="text-right py-1 px-3 font-mono">
-                            <span className={m.avg_confidence >= 90 ? "text-emerald-400" : m.avg_confidence >= 70 ? "text-amber-400" : "text-red-400"}>
-                              {m.avg_confidence}%
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                    ))}
+                  </tbody>
+                </table>
               )}
             </div>
           )}
