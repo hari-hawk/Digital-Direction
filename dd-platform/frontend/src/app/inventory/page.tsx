@@ -110,7 +110,7 @@ function RowDetailSlider({
     try {
       await api.updateRowStatus(projectId, rowIndex, status, comment);
       onSaved();
-    } catch { /* ignore */ }
+    } catch (err) { void err; }
     setSaving(false);
   }
 
@@ -145,31 +145,42 @@ function RowDetailSlider({
   const statusCfg = STATUS_CONFIG[status] || STATUS_CONFIG.in_progress;
 
   return (
-    <>
+    <div>
       {/* Backdrop */}
       <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={onClose} />
 
       {/* Slider panel */}
       <div className="fixed top-0 right-0 z-50 h-full w-full max-w-[45vw] min-w-[400px] bg-zinc-900 border-l border-zinc-700 shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
-          <div>
-            <h2 className="text-lg font-semibold">Row #{rowIndex + 1} Detail</h2>
+        {/* Header — compact with status dropdown near close */}
+        <div className="flex items-center justify-between px-5 py-3 border-b border-zinc-800">
+          <div className="flex items-center gap-3">
+            <h2 className="text-base font-semibold">Row #{rowIndex + 1}</h2>
             {detail && (
-              <div className="flex items-center gap-2 mt-1">
-                <Badge className={statusCfg.cls + " text-xs border"}>{statusCfg.label}</Badge>
-                <span className={`text-xs font-mono ${
-                  (detail.accuracy_score ?? 0) >= 90 ? "text-emerald-400" :
-                  (detail.accuracy_score ?? 0) >= 70 ? "text-amber-400" : "text-red-400"
+              <>
+                <span className={`text-xs font-mono px-2 py-0.5 rounded ${
+                  (detail.accuracy_score ?? 0) >= 90 ? "bg-emerald-500/20 text-emerald-400" :
+                  (detail.accuracy_score ?? 0) >= 70 ? "bg-amber-500/20 text-amber-400" : "bg-red-500/20 text-red-400"
                 }`}>
-                  {detail.accuracy_score}% accuracy
+                  {detail.accuracy_score}%
                 </span>
-              </div>
+              </>
             )}
           </div>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white text-lg">
-            ✕
-          </button>
+          <div className="flex items-center gap-2">
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className={`text-xs rounded px-2 py-1 border ${statusCfg.cls}`}
+            >
+              <option value="completed">✓ Completed</option>
+              <option value="need_review">! Need Review</option>
+              <option value="critical">✕ Critical</option>
+              <option value="in_progress">◌ In Progress</option>
+            </select>
+            <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white text-sm">
+              ✕
+            </button>
+          </div>
         </div>
 
         {/* Content */}
@@ -178,20 +189,31 @@ function RowDetailSlider({
             <div className="text-zinc-400 text-center py-12">Loading row detail...</div>
           ) : detail ? (
             <>
-              {/* Status dropdown */}
-              <div className="mb-4">
-                <label className="text-xs text-zinc-500 block mb-1">Review Status</label>
-                <select
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value)}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm"
-                >
-                  <option value="completed">Completed</option>
-                  <option value="need_review">Need Review</option>
-                  <option value="critical">Critical</option>
-                  <option value="in_progress">In Progress</option>
-                </select>
-              </div>
+              {/* AI Summary — why this status */}
+              {status !== "completed" && detail && (
+                <div className={`mb-3 p-2.5 rounded-lg border text-xs ${
+                  status === "critical" ? "bg-red-950/20 border-red-500/20" :
+                  status === "need_review" ? "bg-amber-950/20 border-amber-500/20" :
+                  "bg-blue-950/20 border-blue-500/20"
+                }`}>
+                  <p className={`font-semibold text-[10px] uppercase mb-1 ${
+                    status === "critical" ? "text-red-400" :
+                    status === "need_review" ? "text-amber-400" : "text-blue-400"
+                  }`}>
+                    {status === "critical" ? "Why Critical" : status === "need_review" ? "Why Need Review" : "Status"}
+                  </p>
+                  <p className={`${
+                    status === "critical" ? "text-red-300/70" :
+                    status === "need_review" ? "text-amber-300/70" : "text-blue-300/70"
+                  }`}>
+                    {status === "critical"
+                      ? `This row has ${100 - (detail.accuracy_score ?? 0)}% of required fields missing or empty. Key fields like Carrier, Service Type, Address, or MRC may be blank. Open the source document to manually verify and fill in the missing data.`
+                      : status === "need_review"
+                      ? `${100 - (detail.accuracy_score ?? 0)}% of fields need verification. Some values were extracted from AI/OCR and may have formatting differences. Compare with source document to confirm accuracy.`
+                      : "Extraction is in progress or awaiting human validation."}
+                  </p>
+                </div>
+              )}
 
               {/* Source Documents — Clickable pills */}
               {detail.source_documents && detail.source_documents.length > 0 && (
@@ -281,7 +303,7 @@ function RowDetailSlider({
           </button>
         </div>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -543,89 +565,134 @@ export default function InventoryPage() {
         </div>
       </div>
 
-      {/* Data Verification Dashboard */}
+      {/* Data Verification Dashboard — Full accordion */}
       {confidence && confidence.total_rows > 0 && activeSheet === "Baseline" && (
-        <div className="mb-4 space-y-2">
-          {/* Confidence Cards — ALWAYS VISIBLE, clickable for filtering */}
-          <div className="grid grid-cols-3 gap-2">
-            <button onClick={() => { setReviewFilter(reviewFilter === "completed" ? "" : "completed"); setPage(1); }}
-              className={`p-3 rounded-lg border text-left transition-all ${
-                reviewFilter === "completed" ? "border-emerald-500/50 bg-emerald-950/30 ring-1 ring-emerald-500/20" : "border-emerald-500/20 bg-emerald-950/10 hover:border-emerald-500/30"
-              }`}>
-              <div className="flex items-center gap-1.5 mb-1">
-                <span className="w-4 h-4 rounded-full bg-emerald-500/20 flex items-center justify-center text-[9px] text-emerald-400">✓</span>
-                <span className="text-[10px] font-semibold text-emerald-400 uppercase">High (90%+)</span>
+        <div className="mb-4">
+          {/* Accordion toggle bar — COLLAPSED: shows numbers only */}
+          <button
+            onClick={() => setConfidenceExpanded(!confidenceExpanded)}
+            className="w-full flex items-center justify-between px-4 py-2 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-zinc-700 transition-colors"
+          >
+            <div className="flex items-center gap-4">
+              <span className="text-sm font-medium text-zinc-300">Data Verification</span>
+              <div className="flex items-center gap-4 text-xs">
+                <button onClick={(e) => { e.stopPropagation(); setReviewFilter(reviewFilter === "completed" ? "" : "completed"); setPage(1); }}
+                  className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full transition-colors ${reviewFilter === "completed" ? "bg-emerald-500/20 ring-1 ring-emerald-500/30" : "hover:bg-emerald-500/10"}`}>
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <span className="text-emerald-400 font-bold">{confidence.high.toLocaleString()}</span>
+                  <span className="text-zinc-500">({confidence.high_pct}%)</span>
+                </button>
+                <button onClick={(e) => { e.stopPropagation(); setReviewFilter(reviewFilter === "need_review" ? "" : "need_review"); setPage(1); }}
+                  className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full transition-colors ${reviewFilter === "need_review" ? "bg-amber-500/20 ring-1 ring-amber-500/30" : "hover:bg-amber-500/10"}`}>
+                  <span className="w-2 h-2 rounded-full bg-amber-500" />
+                  <span className="text-amber-400 font-bold">{confidence.medium.toLocaleString()}</span>
+                  <span className="text-zinc-500">({confidence.medium_pct}%)</span>
+                </button>
+                <button onClick={(e) => { e.stopPropagation(); setReviewFilter(reviewFilter === "critical" ? "" : "critical"); setPage(1); }}
+                  className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full transition-colors ${reviewFilter === "critical" ? "bg-red-500/20 ring-1 ring-red-500/30" : "hover:bg-red-500/10"}`}>
+                  <span className="w-2 h-2 rounded-full bg-red-500" />
+                  <span className="text-red-400 font-bold">{confidence.needs_review.toLocaleString()}</span>
+                  <span className="text-zinc-500">({confidence.needs_review_pct}%)</span>
+                </button>
               </div>
-              <p className="text-lg font-bold text-emerald-300">{confidence.high.toLocaleString()}</p>
-              <div className="w-full bg-emerald-900/30 rounded-full h-1 mt-1">
-                <div className="bg-emerald-500 h-1 rounded-full" style={{ width: `${confidence.high_pct}%` }} />
-              </div>
-            </button>
+            </div>
+            <span className={`text-zinc-500 transition-transform ${confidenceExpanded ? "rotate-180" : ""}`}>▼</span>
+          </button>
 
-            <button onClick={() => { setReviewFilter(reviewFilter === "need_review" ? "" : "need_review"); setPage(1); }}
-              className={`p-3 rounded-lg border text-left transition-all ${
-                reviewFilter === "need_review" ? "border-amber-500/50 bg-amber-950/30 ring-1 ring-amber-500/20" : "border-amber-500/20 bg-amber-950/10 hover:border-amber-500/30"
-              }`}>
-              <div className="flex items-center gap-1.5 mb-1">
-                <span className="w-4 h-4 rounded-full bg-amber-500/20 flex items-center justify-center text-[9px] text-amber-400">!</span>
-                <span className="text-[10px] font-semibold text-amber-400 uppercase">Medium (70-89%)</span>
-              </div>
-              <p className="text-lg font-bold text-amber-300">{confidence.medium.toLocaleString()}</p>
-              <div className="w-full bg-amber-900/30 rounded-full h-1 mt-1">
-                <div className="bg-amber-500 h-1 rounded-full" style={{ width: `${confidence.medium_pct}%` }} />
-              </div>
-            </button>
+          {/* EXPANDED: full cards with context + data source table */}
+          {confidenceExpanded && (
+            <div className="mt-2 space-y-3">
+              {/* Full confidence cards with context descriptions */}
+              <div className="grid grid-cols-3 gap-2">
+                <button onClick={() => { setReviewFilter(reviewFilter === "completed" ? "" : "completed"); setPage(1); }}
+                  className={`p-3 rounded-lg border text-left transition-all ${
+                    reviewFilter === "completed" ? "border-emerald-500/50 bg-emerald-950/30 ring-1 ring-emerald-500/20" : "border-emerald-500/20 bg-emerald-950/10 hover:border-emerald-500/30"
+                  }`}>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span className="w-4 h-4 rounded-full bg-emerald-500/20 flex items-center justify-center text-[9px] text-emerald-400">✓</span>
+                    <span className="text-[10px] font-semibold text-emerald-400 uppercase">High Confidence (90%+)</span>
+                  </div>
+                  <p className="text-xl font-bold text-emerald-300">{confidence.high.toLocaleString()}</p>
+                  <p className="text-[10px] text-emerald-400/60">{confidence.high_pct}% of rows</p>
+                  <div className="w-full bg-emerald-900/30 rounded-full h-1.5 mt-1.5">
+                    <div className="bg-emerald-500 h-1.5 rounded-full" style={{ width: `${confidence.high_pct}%` }} />
+                  </div>
+                  <div className="mt-2 p-2 rounded bg-emerald-900/20 border border-emerald-500/10">
+                    <p className="text-[10px] font-semibold text-emerald-400 uppercase">No Action Needed</p>
+                    <p className="text-[10px] text-emerald-400/50 mt-0.5">Data from structured sources (CSR regex, XLSX columns). Auto-verified — values match source documents.</p>
+                  </div>
+                </button>
 
-            <button onClick={() => { setReviewFilter(reviewFilter === "critical" ? "" : "critical"); setPage(1); }}
-              className={`p-3 rounded-lg border text-left transition-all ${
-                reviewFilter === "critical" ? "border-red-500/50 bg-red-950/30 ring-1 ring-red-500/20" : "border-red-500/20 bg-red-950/10 hover:border-red-500/30"
-              }`}>
-              <div className="flex items-center gap-1.5 mb-1">
-                <span className="w-4 h-4 rounded-full bg-red-500/20 flex items-center justify-center text-[9px] text-red-400">✕</span>
-                <span className="text-[10px] font-semibold text-red-400 uppercase">Review (&lt;70%)</span>
-              </div>
-              <p className="text-lg font-bold text-red-300">{confidence.needs_review.toLocaleString()}</p>
-              <div className="w-full bg-red-900/30 rounded-full h-1 mt-1">
-                <div className="bg-red-500 h-1 rounded-full" style={{ width: `${confidence.needs_review_pct}%` }} />
-              </div>
-            </button>
-          </div>
+                <button onClick={() => { setReviewFilter(reviewFilter === "need_review" ? "" : "need_review"); setPage(1); }}
+                  className={`p-3 rounded-lg border text-left transition-all ${
+                    reviewFilter === "need_review" ? "border-amber-500/50 bg-amber-950/30 ring-1 ring-amber-500/20" : "border-amber-500/20 bg-amber-950/10 hover:border-amber-500/30"
+                  }`}>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span className="w-4 h-4 rounded-full bg-amber-500/20 flex items-center justify-center text-[9px] text-amber-400">!</span>
+                    <span className="text-[10px] font-semibold text-amber-400 uppercase">Medium Confidence (70-89%)</span>
+                  </div>
+                  <p className="text-xl font-bold text-amber-300">{confidence.medium.toLocaleString()}</p>
+                  <p className="text-[10px] text-amber-400/60">{confidence.medium_pct}% of rows</p>
+                  <div className="w-full bg-amber-900/30 rounded-full h-1.5 mt-1.5">
+                    <div className="bg-amber-500 h-1.5 rounded-full" style={{ width: `${confidence.medium_pct}%` }} />
+                  </div>
+                  <div className="mt-2 p-2 rounded bg-amber-900/20 border border-amber-500/10">
+                    <p className="text-[10px] font-semibold text-amber-400 uppercase">Spot Check Recommended</p>
+                    <p className="text-[10px] text-amber-400/50 mt-0.5">Data from AI extraction or generated rollups. Randomly sample 10-20% of these rows and verify against source files.</p>
+                  </div>
+                </button>
 
-          {/* Data Source Table — COLLAPSIBLE accordion */}
-          {confidence.extraction_methods.length > 0 && (
-            <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900">
-              <button
-                onClick={() => setConfidenceExpanded(!confidenceExpanded)}
-                className="w-full flex items-center justify-between px-3 py-2 hover:bg-zinc-800/50 transition-colors"
-              >
-                <span className="text-xs font-medium text-zinc-400">Data Source & Confidence</span>
-                <span className={`text-zinc-500 text-xs transition-transform ${confidenceExpanded ? "rotate-180" : ""}`}>▼</span>
-              </button>
-              {confidenceExpanded && (
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-t border-b border-zinc-800 text-zinc-500 uppercase text-[10px]">
-                      <th className="text-left py-1.5 px-3">Carrier</th>
-                      <th className="text-right py-1.5 px-3">Rows</th>
-                      <th className="text-right py-1.5 px-3">Spend</th>
-                      <th className="text-right py-1.5 px-3">Confidence</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {confidence.extraction_methods.map((m) => (
-                      <tr key={m.carrier} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
-                        <td className="py-1 px-3 text-zinc-300">{m.carrier}</td>
-                        <td className="text-right py-1 px-3 text-zinc-400 font-mono">{m.rows.toLocaleString()}</td>
-                        <td className="text-right py-1 px-3 text-zinc-400 font-mono">${m.mrc.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</td>
-                        <td className="text-right py-1 px-3 font-mono">
-                          <span className={m.avg_confidence >= 90 ? "text-emerald-400" : m.avg_confidence >= 70 ? "text-amber-400" : "text-red-400"}>
-                            {m.avg_confidence}%
-                          </span>
-                        </td>
+                <button onClick={() => { setReviewFilter(reviewFilter === "critical" ? "" : "critical"); setPage(1); }}
+                  className={`p-3 rounded-lg border text-left transition-all ${
+                    reviewFilter === "critical" ? "border-red-500/50 bg-red-950/30 ring-1 ring-red-500/20" : "border-red-500/20 bg-red-950/10 hover:border-red-500/30"
+                  }`}>
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span className="w-4 h-4 rounded-full bg-red-500/20 flex items-center justify-center text-[9px] text-red-400">✕</span>
+                    <span className="text-[10px] font-semibold text-red-400 uppercase">Needs Review (&lt;70%)</span>
+                  </div>
+                  <p className="text-xl font-bold text-red-300">{confidence.needs_review.toLocaleString()}</p>
+                  <p className="text-[10px] text-red-400/60">{confidence.needs_review_pct}% of rows</p>
+                  <div className="w-full bg-red-900/30 rounded-full h-1.5 mt-1.5">
+                    <div className="bg-red-500 h-1.5 rounded-full" style={{ width: `${confidence.needs_review_pct}%` }} />
+                  </div>
+                  <div className="mt-2 p-2 rounded bg-red-900/20 border border-red-500/10">
+                    <p className="text-[10px] font-semibold text-red-400 uppercase">Manual Verification Required</p>
+                    <p className="text-[10px] text-red-400/50 mt-0.5">Review every row. Open source file listed below, find the matching data, confirm or correct values in the inventory.</p>
+                  </div>
+                </button>
+              </div>
+
+              {/* Data Source & Confidence Table */}
+              {confidence.extraction_methods.length > 0 && (
+                <div className="overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900">
+                  <div className="px-3 py-1.5 border-b border-zinc-800">
+                    <span className="text-xs font-medium text-zinc-400">Data Source & Confidence</span>
+                  </div>
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-zinc-800 text-zinc-500 uppercase text-[10px]">
+                        <th className="text-left py-1.5 px-3">Carrier</th>
+                        <th className="text-right py-1.5 px-3">Rows</th>
+                        <th className="text-right py-1.5 px-3">Spend</th>
+                        <th className="text-right py-1.5 px-3">Avg Confidence</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {confidence.extraction_methods.map((m) => (
+                        <tr key={m.carrier} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
+                          <td className="py-1 px-3 text-zinc-300">{m.carrier}</td>
+                          <td className="text-right py-1 px-3 text-zinc-400 font-mono">{m.rows.toLocaleString()}</td>
+                          <td className="text-right py-1 px-3 text-zinc-400 font-mono">${m.mrc.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</td>
+                          <td className="text-right py-1 px-3 font-mono">
+                            <span className={m.avg_confidence >= 90 ? "text-emerald-400" : m.avg_confidence >= 70 ? "text-amber-400" : "text-red-400"}>
+                              {m.avg_confidence}%
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               )}
             </div>
           )}
@@ -737,7 +804,7 @@ export default function InventoryPage() {
           {/* Filters -- only for Baseline */}
           {activeSheet === "Baseline" && (
             <div className="mb-4">
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
                 <div>
                   <label className="text-xs text-zinc-500 block mb-1">Search</label>
                   <Input
@@ -785,6 +852,16 @@ export default function InventoryPage() {
                     className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-sm h-9">
                     <option value="">All</option>
                     {filterOptions.charge_types.map((v) => <option key={v} value={v}>{v}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-zinc-500 block mb-1">Review</label>
+                  <select value={reviewFilter} onChange={(e) => { setReviewFilter(e.target.value); setPage(1); }}
+                    className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-sm h-9">
+                    <option value="">All Reviews</option>
+                    <option value="completed">✓ Completed (90%+)</option>
+                    <option value="need_review">! Need Review (70-89%)</option>
+                    <option value="critical">✕ Critical (&lt;70%)</option>
                   </select>
                 </div>
               </div>
@@ -935,6 +1012,20 @@ export default function InventoryPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Status Disclaimer */}
+          {activeSheet === "Baseline" && (
+            <div className="mt-3 px-1 flex flex-wrap gap-x-6 gap-y-1 text-[10px] text-zinc-500">
+              <span><span className="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1" />
+                <strong className="text-zinc-400">Completed</strong> — All required fields populated (≥90% accuracy). Data verified from structured sources.</span>
+              <span><span className="inline-block w-2 h-2 rounded-full bg-amber-500 mr-1" />
+                <strong className="text-zinc-400">Need Review</strong> — Some fields missing or unverified (70-89%). Spot-check against source documents recommended.</span>
+              <span><span className="inline-block w-2 h-2 rounded-full bg-red-500 mr-1" />
+                <strong className="text-zinc-400">Critical</strong> — Multiple required fields missing (&lt;70%). Manual verification and data entry required.</span>
+              <span><span className="inline-block w-2 h-2 rounded-full bg-blue-500 mr-1" />
+                <strong className="text-zinc-400">In Progress</strong> — Extraction ongoing or pending human review. Status will update after validation.</span>
+            </div>
+          )}
         </>
       )}
     </div>
