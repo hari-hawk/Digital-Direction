@@ -165,10 +165,24 @@ export default function DocumentsPage() {
 
   useEffect(() => {
     if (!ready) return;
+    // Abort previous fetch if projectId changes
+    let cancelled = false;
     setLoading(true);
     Promise.all([api.getCarriers(projectId), api.getDocuments(projectId)])
-      .then(([c, d]) => { setCarriers(c); setDocs(d); setLoading(false); })
-      .catch(() => setLoading(false));
+      .then(([c, d]) => {
+        if (cancelled) return;
+        setCarriers(c || []);
+        setDocs(d || []);
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error("Failed to load documents:", err);
+        setCarriers([]);
+        setDocs([]);
+        setLoading(false);
+      });
+    return () => { cancelled = true; };
   }, [projectId, ready]);
 
   if (loading) return <div className="text-zinc-400 p-8">Loading documents...</div>;
