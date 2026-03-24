@@ -254,6 +254,31 @@ def run_pipeline(
             mrc_inferred += 1
     logger.info(f"Experiment 6 — MRC inference: {mrc_inferred} rows inferred from cost_per_unit * quantity")
 
+    # Experiment 7: Deduplication — remove exact duplicate rows
+    before_dedup = len(result.rows)
+    seen_hashes = set()
+    unique_rows = []
+    for row in result.rows:
+        # Build hash from key fields
+        key_parts = [
+            str(row.carrier or "").strip(),
+            str(row.carrier_account_number or "").strip(),
+            str(row.service_type or "").strip(),
+            str(row.service_or_component or "").strip(),
+            str(row.service_address or getattr(row, "service_address_1", "") or "").strip(),
+            str(row.component_or_feature_name or "").strip(),
+            str(row.monthly_recurring_cost or "").strip(),
+            str(row.charge_type or "").strip(),
+            str(row.phone_number or "").strip(),
+        ]
+        row_hash = "|".join(key_parts).lower()
+        if row_hash not in seen_hashes:
+            seen_hashes.add(row_hash)
+            unique_rows.append(row)
+    result.rows = unique_rows
+    dedup_removed = before_dedup - len(result.rows)
+    logger.info(f"Experiment 7 — Deduplication: removed {dedup_removed} duplicate rows ({before_dedup} → {len(result.rows)})")
+
     # --- Stage 3: Confidence scoring ---
     logger.info("\n--- Stage 3: Confidence Scoring ---")
     for row in result.rows:
@@ -419,6 +444,30 @@ def run_all_carriers(
                         row.zip_code = "14203"
                     if not (row.city or "").strip():
                         row.city = "Buffalo"
+
+            # Deduplication
+            seen_hashes = set()
+            unique_rows = []
+            for row in result.rows:
+                key_parts = [
+                    str(row.carrier or "").strip(),
+                    str(row.carrier_account_number or "").strip(),
+                    str(row.service_type or "").strip(),
+                    str(row.service_or_component or "").strip(),
+                    str(row.service_address or getattr(row, "service_address_1", "") or "").strip(),
+                    str(row.component_or_feature_name or "").strip(),
+                    str(row.monthly_recurring_cost or "").strip(),
+                    str(row.charge_type or "").strip(),
+                    str(row.phone_number or "").strip(),
+                ]
+                row_hash = "|".join(key_parts).lower()
+                if row_hash not in seen_hashes:
+                    seen_hashes.add(row_hash)
+                    unique_rows.append(row)
+            dedup_removed = len(result.rows) - len(unique_rows)
+            result.rows = unique_rows
+            if dedup_removed > 0:
+                logger.info(f"  Dedup: removed {dedup_removed} duplicates")
 
             for row in result.rows:
                 row.confidence = score_row_confidence(row)
