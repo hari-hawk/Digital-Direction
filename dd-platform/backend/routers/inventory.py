@@ -18,6 +18,10 @@ _sheet_cache = {}  # type: dict
 def _resolve_file(proj: dict, source: str) -> str:
     if source == "extracted":
         output_dir = Path(proj["output_dir"])
+        # Prefer the combined all-carriers file
+        all_carriers = output_dir / "all_carriers_inventory_output.xlsx"
+        if all_carriers.exists():
+            return str(all_carriers)
         output_files = sorted(output_dir.glob("*_inventory_output.xlsx"))
         return str(output_files[-1]) if output_files else proj["reference_file"]
     return proj["reference_file"]

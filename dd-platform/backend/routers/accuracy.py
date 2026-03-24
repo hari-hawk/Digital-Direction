@@ -26,13 +26,49 @@ def _find_col(columns: list[str], target: str) -> str | None:
     return None
 
 
+def _normalize_address(addr: str) -> str:
+    """Normalize address for fuzzy matching."""
+    import re
+    addr = addr.lower().strip()
+    # Remove periods, commas, extra spaces
+    addr = addr.replace(".", "").replace(",", "")
+    addr = re.sub(r"\s+", " ", addr)
+    # Normalize common abbreviations
+    replacements = {
+        " street": " st", " avenue": " ave", " boulevard": " blvd",
+        " drive": " dr", " road": " rd", " lane": " ln",
+        " court": " ct", " circle": " cir", " place": " pl",
+        " highway": " hwy", " parkway": " pkwy", " terrace": " ter",
+        " north": " n", " south": " s", " east": " e", " west": " w",
+    }
+    for full, abbr in replacements.items():
+        addr = addr.replace(full, abbr)
+    return addr
+
+
+def _normalize_account(acct: str) -> str:
+    """Normalize account number for matching."""
+    # Strip spaces, dashes, leading zeros (but keep at least 1 digit)
+    acct = acct.lower().strip().replace(" ", "").replace("-", "")
+    # Remove leading zeros
+    acct = acct.lstrip("0") or "0"
+    return acct
+
+
 def _build_key(row: pd.Series, col_map: dict[str, str]) -> str:
-    """Build a composite key from key columns."""
+    """Build a normalized composite key from key columns."""
     parts = []
     for key_col in KEY_COLUMNS:
         mapped = col_map.get(key_col)
         if mapped:
             val = str(row.get(mapped, "")).strip().lower()
+            if val in ("nan", "none", ""):
+                val = ""
+            # Apply type-specific normalization
+            if "address" in key_col.lower():
+                val = _normalize_address(val)
+            elif "account" in key_col.lower():
+                val = _normalize_account(val)
         else:
             val = ""
         parts.append(val)
@@ -65,8 +101,16 @@ def _load_baseline(file_path: str, header_row: int = 2) -> pd.DataFrame:
 
 
 def _resolve_extracted_file(proj: dict) -> str | None:
-    """Find the latest extracted inventory output file."""
+    """Find the best extracted inventory output file.
+    Prefer 'all_carriers' combined file, then fall back to latest individual."""
     output_dir = Path(proj["output_dir"])
+
+    # Prefer the combined all-carriers file
+    all_carriers = output_dir / "all_carriers_inventory_output.xlsx"
+    if all_carriers.exists():
+        return str(all_carriers)
+
+    # Fall back to latest individual output
     output_files = sorted(output_dir.glob("*_inventory_output.xlsx"))
     return str(output_files[-1]) if output_files else None
 
@@ -217,16 +261,35 @@ def compute_accuracy(proj: dict) -> dict:
                 if pd.notna(k)
             ]
 
+    # --- Lenient matching: Carrier + Address only (shows address coverage) ---
+    addr_col_ref = ref_col_map.get("Service Address 1")
+    addr_col_ext = ext_col_map.get("Service Address 1")
+
+    lenient_match_rate = 0
+    if carrier_col_ref and carrier_col_ext and addr_col_ref and addr_col_ext:
+        def _lenient_key(row, carrier_c, addr_c):
+            carrier = str(row.get(carrier_c, "")).strip().lower()
+            addr = _normalize_address(str(row.get(addr_c, "")).strip().lower())
+            return f"{carrier}|{addr}"
+
+        ref_lenient = set(ref_df.apply(lambda r: _lenient_key(r, carrier_col_ref, addr_col_ref), axis=1))
+        ext_lenient = set(ext_df.apply(lambda r: _lenient_key(r, carrier_col_ext, addr_col_ext), axis=1))
+        lenient_matched = ref_lenient & ext_lenient
+        lenient_match_rate = round(len(lenient_matched) / len(ref_lenient) * 100, 1) if ref_lenient else 0
+
     return {
         "has_data": True,
         "summary": {
             "overall_match_rate": overall_match_rate,
+            "lenient_match_rate": lenient_match_rate,
             "total_ref_rows": total_ref,
             "total_ext_rows": total_ext,
             "matched_rows": total_matched,
             "missing_rows": len(missing_keys),
             "extra_rows": len(extra_keys),
             "columns_compared": len(compare_cols),
+            "total_ref_raw": len(ref_df),
+            "total_ext_raw": len(ext_df),
         },
         "per_carrier": sorted(carrier_stats.values(), key=lambda x: x["carrier"]),
         "per_column": per_column,
