@@ -1,9 +1,9 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { api } from "@/lib/api";
+import { api, RowDetailResponse } from "@/lib/api";
 import { useProjectId } from "@/hooks/useProjectId";
 
 interface SheetInfo { name: string; rows: number; cols: number }
@@ -25,12 +25,252 @@ const EMPTY_FILTERS: FilterState = {
   carrier: "", service_type: "", charge_type: "", scu_code: "", status: "", search: "",
 };
 
+// Status badge config
+const STATUS_CONFIG: Record<string, { label: string; cls: string }> = {
+  completed: { label: "Completed", cls: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30" },
+  need_review: { label: "Need Review", cls: "bg-amber-500/20 text-amber-300 border-amber-500/30" },
+  critical: { label: "Critical", cls: "bg-red-500/20 text-red-300 border-red-500/30" },
+  in_progress: { label: "In Progress", cls: "bg-blue-500/20 text-blue-300 border-blue-500/30" },
+};
+
+// Field grouping for the slider detail view
+const FIELD_GROUPS: Record<string, string[]> = {
+  "Location": ["Service Address 1", "Service Address 2", "City", "State", "Zip", "Country", "Location Code", "Building", "Floor", "Room"],
+  "Service": ["Service Type", "Charge Type", "Service or Component", "Component or Feature Name", "Access Speed", "Upload Speed", "Phone Number", "Carrier Circuit Number"],
+  "Billing": ["Billing Name", "Billing Address", "Monthly Recurring Cost", "Non Recurring Charges", "Usage Charges", "Total Charges"],
+  "Contract": ["Contract Number", "Contract Start", "Contract End", "Term", "Contract Term", "Auto Renew"],
+  "Carrier": ["Carrier", "Carrier Account Number", "Carrier Name", "Vendor"],
+  "Status": ["Status"],
+};
+
+function useDebounce<T>(value: T, delay: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return debounced;
+}
+
+// ═══════════════════════════════════════════
+// Row Detail Slider Panel
+// ═══════════════════════════════════════════
+function RowDetailSlider({
+  projectId,
+  rowIndex,
+  source,
+  onClose,
+  onSaved,
+}: {
+  projectId: string;
+  rowIndex: number;
+  source: string;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [detail, setDetail] = useState<RowDetailResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [editedFields, setEditedFields] = useState<Record<string, string>>({});
+  const [status, setStatus] = useState("in_progress");
+  const [comment, setComment] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    api.getRowDetail(projectId, rowIndex, source).then((d) => {
+      setDetail(d);
+      setStatus(d.status || "in_progress");
+      setComment(d.comment || "");
+      // Initialize editable fields
+      const fields: Record<string, string> = {};
+      for (const f of d.fields) {
+        fields[f.field_name] = f.field_value === null || f.field_value === undefined ? "" : String(f.field_value);
+      }
+      setEditedFields(fields);
+      setLoading(false);
+    }).catch(() => setLoading(false));
+  }, [projectId, rowIndex, source]);
+
+  // Close on Escape
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await api.updateRowStatus(projectId, rowIndex, status, comment);
+      onSaved();
+    } catch { /* ignore */ }
+    setSaving(false);
+  }
+
+  // Group fields
+  function groupFields() {
+    if (!detail) return [];
+    const fieldEntries = detail.fields.map((f) => ({ lower: f.field_name.toLowerCase(), original: f.field_name }));
+    const assigned = new Set<string>();
+    const groups: { name: string; fields: string[] }[] = [];
+
+    for (const [groupName, patterns] of Object.entries(FIELD_GROUPS)) {
+      const matched: string[] = [];
+      for (const pattern of patterns) {
+        for (const entry of fieldEntries) {
+          if (entry.lower.includes(pattern.toLowerCase()) && !assigned.has(entry.original)) {
+            matched.push(entry.original);
+            assigned.add(entry.original);
+          }
+        }
+      }
+      if (matched.length > 0) groups.push({ name: groupName, fields: matched });
+    }
+
+    // Remaining ungrouped fields
+    const remaining = detail.fields.filter((f) => !assigned.has(f.field_name)).map((f) => f.field_name);
+    if (remaining.length > 0) groups.push({ name: "Other", fields: remaining });
+
+    return groups;
+  }
+
+  const fieldGroups = groupFields();
+  const statusCfg = STATUS_CONFIG[status] || STATUS_CONFIG.in_progress;
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+
+      {/* Slider panel */}
+      <div className="fixed top-0 right-0 z-50 h-full w-full max-w-[45vw] min-w-[400px] bg-zinc-900 border-l border-zinc-700 shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
+          <div>
+            <h2 className="text-lg font-semibold">Row #{rowIndex + 1} Detail</h2>
+            {detail && (
+              <div className="flex items-center gap-2 mt-1">
+                <Badge className={statusCfg.cls + " text-xs border"}>{statusCfg.label}</Badge>
+                <span className={`text-xs font-mono ${
+                  (detail.accuracy_score ?? 0) >= 90 ? "text-emerald-400" :
+                  (detail.accuracy_score ?? 0) >= 70 ? "text-amber-400" : "text-red-400"
+                }`}>
+                  {detail.accuracy_score}% accuracy
+                </span>
+              </div>
+            )}
+          </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white text-lg">
+            ✕
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto px-5 py-4">
+          {loading ? (
+            <div className="text-zinc-400 text-center py-12">Loading row detail...</div>
+          ) : detail ? (
+            <>
+              {/* Status dropdown */}
+              <div className="mb-4">
+                <label className="text-xs text-zinc-500 block mb-1">Review Status</label>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm"
+                >
+                  <option value="completed">Completed</option>
+                  <option value="need_review">Need Review</option>
+                  <option value="critical">Critical</option>
+                  <option value="in_progress">In Progress</option>
+                </select>
+              </div>
+
+              {/* Field groups */}
+              {fieldGroups.map((group) => (
+                <div key={group.name} className="mb-5">
+                  <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2 border-b border-zinc-800 pb-1">
+                    {group.name}
+                  </h3>
+                  <div className="space-y-2">
+                    {group.fields.map((fieldName) => (
+                      <div key={fieldName} className="grid grid-cols-[140px_1fr] gap-2 items-start">
+                        <label className="text-xs text-zinc-500 pt-2 truncate" title={fieldName}>
+                          {fieldName.length > 20 ? fieldName.substring(0, 18) + ".." : fieldName}
+                        </label>
+                        <input
+                          type="text"
+                          value={editedFields[fieldName] || ""}
+                          onChange={(e) => setEditedFields((prev) => ({ ...prev, [fieldName]: e.target.value }))}
+                          className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1.5 text-sm text-zinc-200 focus:border-blue-500 focus:outline-none"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              {/* Source Documents */}
+              {detail.source_documents && detail.source_documents.length > 0 && (
+                <div className="mb-5">
+                  <h3 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2 border-b border-zinc-800 pb-1">
+                    Source Documents
+                  </h3>
+                  <div className="space-y-1">
+                    {detail.source_documents.map((doc, i) => (
+                      <div key={i} className="flex items-center gap-2 text-xs text-zinc-400 bg-zinc-800/50 rounded px-2 py-1.5">
+                        <span className="text-sm">📄</span>
+                        <span className="truncate">{doc}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Comment */}
+              <div className="mb-4">
+                <label className="text-xs text-zinc-500 block mb-1">Review Comment</label>
+                <textarea
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  rows={3}
+                  placeholder="Add notes about this row..."
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-zinc-200 resize-none focus:border-blue-500 focus:outline-none"
+                />
+              </div>
+            </>
+          ) : (
+            <div className="text-zinc-500 text-center py-12">Row not found.</div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-3 border-t border-zinc-800 flex items-center justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-zinc-400 hover:text-zinc-200 rounded-lg bg-zinc-800 hover:bg-zinc-700">
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+          >
+            {saving ? "Saving..." : "Save"}
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ═══════════════════════════════════════════
+// Main Inventory Page
+// ═══════════════════════════════════════════
 export default function InventoryPage() {
   const projectId = useProjectId();
   const [sheets, setSheets] = useState<SheetInfo[]>([]);
   const [activeSheet, setActiveSheet] = useState("Baseline");
   const [source, setSource] = useState<"reference" | "extracted">("reference");
-  const [rows, setRows] = useState<{ row_index: number; data: Record<string, unknown>; service_or_component?: string }[]>([]);
+  const [rows, setRows] = useState<{ row_index: number; data: Record<string, unknown>; service_or_component?: string; accuracy?: number; status?: string; source_files?: string[] }[]>([]);
   const [columns, setColumns] = useState<string[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -47,12 +287,27 @@ export default function InventoryPage() {
   const [checklistLoading, setChecklistLoading] = useState(false);
   const [showAllColumns, setShowAllColumns] = useState(false);
 
-  // Load sheets when source changes — reset to Baseline if current sheet not available
+  // Slider panel state
+  const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null);
+
+  // Debounced search
+  const [searchInput, setSearchInput] = useState("");
+  const debouncedSearch = useDebounce(searchInput, 300);
+
+  // Sync debounced search into filters
+  useEffect(() => {
+    setFilters((prev) => {
+      if (prev.search === debouncedSearch) return prev;
+      return { ...prev, search: debouncedSearch };
+    });
+    setPage(1);
+  }, [debouncedSearch]);
+
+  // Load sheets when source changes
   useEffect(() => {
     api.getInventorySheets(projectId, source).then((d) => {
       const loadedSheets = d.sheets || [];
       setSheets(loadedSheets);
-      // If active sheet doesn't exist in new source, reset to Baseline
       const sheetNames = loadedSheets.map((s: SheetInfo) => s.name);
       if (!sheetNames.includes(activeSheet)) {
         setActiveSheet("Baseline");
@@ -63,7 +318,6 @@ export default function InventoryPage() {
 
   // Load table data
   const loadData = useCallback(async () => {
-    // Skip loading table data for checklist — it has its own loader
     if (activeSheet.toLowerCase().includes("checklist")) return;
 
     setLoading(true);
@@ -83,8 +337,8 @@ export default function InventoryPage() {
       const data = await api.getInventory(projectId, params);
       setRows(data.rows || []);
       setTotal(data.total || 0);
-      if ((data as Record<string, unknown>).columns) {
-        setColumns((data as Record<string, unknown>).columns as string[]);
+      if ((data as unknown as Record<string, unknown>).columns) {
+        setColumns((data as unknown as Record<string, unknown>).columns as string[]);
       }
     } catch { setRows([]); setTotal(0); }
     setLoading(false);
@@ -118,7 +372,6 @@ export default function InventoryPage() {
     setActiveSheet(name);
     setPage(1);
     setSort({ column: "", direction: "asc" });
-    // Clear Baseline-specific filters when switching away
     if (name !== "Baseline") {
       setFilters({ ...EMPTY_FILTERS, search: filters.search });
     }
@@ -128,6 +381,7 @@ export default function InventoryPage() {
     setSource(newSource);
     setPage(1);
     setFilters(EMPTY_FILTERS);
+    setSearchInput("");
     setSort({ column: "", direction: "asc" });
   }
 
@@ -139,12 +393,17 @@ export default function InventoryPage() {
   }
 
   function updateFilter(key: keyof FilterState, value: string) {
+    if (key === "search") {
+      setSearchInput(value);
+      return;
+    }
     setFilters((prev) => ({ ...prev, [key]: value }));
     setPage(1);
   }
 
   function clearFilters() {
     setFilters(EMPTY_FILTERS);
+    setSearchInput("");
     setSort({ column: "", direction: "asc" });
     setPage(1);
   }
@@ -156,17 +415,43 @@ export default function InventoryPage() {
   }
 
   async function saveChecklist() {
-    await api.updateChecklist(projectId, checklistItems);
+    await api.updateChecklist(projectId, checklistItems as Record<string, string>[]);
     alert("Checklist saved!");
   }
 
   const totalPages = Math.ceil(total / pageSize);
-  const hasActiveFilters = Object.values(filters).some((v) => v !== "");
+  const hasActiveFilters = Object.values(filters).some((v) => v !== "") || searchInput !== "";
   const isChecklist = activeSheet.toLowerCase().includes("checklist");
+
+  // Accuracy helper
+  function accuracyColor(acc: number): string {
+    if (acc >= 90) return "text-emerald-400";
+    if (acc >= 70) return "text-amber-400";
+    return "text-red-400";
+  }
+  function accuracyBg(acc: number): string {
+    if (acc >= 90) return "bg-emerald-500/10";
+    if (acc >= 70) return "bg-amber-500/10";
+    return "bg-red-500/10";
+  }
 
   // === RENDER ===
   return (
     <div>
+      {/* Row Detail Slider */}
+      {selectedRowIndex !== null && (
+        <RowDetailSlider
+          projectId={projectId}
+          rowIndex={selectedRowIndex}
+          source={source}
+          onClose={() => setSelectedRowIndex(null)}
+          onSaved={() => {
+            setSelectedRowIndex(null);
+            loadData();
+          }}
+        />
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
@@ -177,7 +462,7 @@ export default function InventoryPage() {
           </p>
         </div>
         <div className="flex gap-2 items-center">
-          {/* Toggle Switch: Reference ↔ Extracted */}
+          {/* Toggle Switch: Reference <-> Extracted */}
           <div className="flex items-center bg-zinc-800 rounded-lg border border-zinc-700 p-0.5">
             <button
               onClick={() => switchSource("reference")}
@@ -309,7 +594,7 @@ export default function InventoryPage() {
       {/* === TABLE VIEW (non-checklist sheets) === */}
       {!isChecklist && (
         <>
-          {/* Filters — only for Baseline */}
+          {/* Filters -- only for Baseline */}
           {activeSheet === "Baseline" && (
             <div className="mb-4">
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -317,8 +602,8 @@ export default function InventoryPage() {
                   <label className="text-xs text-zinc-500 block mb-1">Search</label>
                   <Input
                     placeholder="Search all columns..."
-                    value={filters.search}
-                    onChange={(e) => updateFilter("search", e.target.value)}
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
                     className="bg-zinc-800 border-zinc-700 text-sm h-9"
                   />
                 </div>
@@ -376,8 +661,8 @@ export default function InventoryPage() {
             <div className="mb-4 max-w-sm">
               <Input
                 placeholder={`Search ${activeSheet}...`}
-                value={filters.search}
-                onChange={(e) => updateFilter("search", e.target.value)}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
                 className="bg-zinc-800 border-zinc-700 text-sm h-9"
               />
             </div>
@@ -403,6 +688,18 @@ export default function InventoryPage() {
                     <thead className="bg-zinc-900">
                       <tr className="border-b border-zinc-700">
                         <th className="text-left py-2 px-2 text-zinc-500 font-medium w-10">#</th>
+                        {/* Accuracy column -- first visible */}
+                        {activeSheet === "Baseline" && (
+                          <th className="text-left py-2 px-2 text-zinc-400 font-medium whitespace-nowrap w-16">
+                            Accuracy
+                          </th>
+                        )}
+                        {/* Review Status column */}
+                        {activeSheet === "Baseline" && (
+                          <th className="text-left py-2 px-2 text-zinc-400 font-medium whitespace-nowrap w-24">
+                            Review
+                          </th>
+                        )}
                         {displayColumns.map((col) => (
                           <th
                             key={col}
@@ -427,9 +724,30 @@ export default function InventoryPage() {
                           || String(row.data["Service or Component"] || row.data["Service or Component "] || "").trim();
                         const rowBg = scu === "S" ? "bg-blue-950/30 border-l-2 border-l-blue-500"
                           : scu.startsWith("T") ? "bg-amber-950/20 border-l-2 border-l-amber-500" : "";
+                        const acc = row.accuracy ?? 0;
+                        const rowStatus = row.status || "in_progress";
+                        const sCfg = STATUS_CONFIG[rowStatus] || STATUS_CONFIG.in_progress;
                         return (
-                          <tr key={row.row_index} className={`border-b border-zinc-800/50 hover:bg-zinc-800/50 ${rowBg}`}>
+                          <tr
+                            key={row.row_index}
+                            onClick={() => setSelectedRowIndex(row.row_index)}
+                            className={`border-b border-zinc-800/50 hover:bg-zinc-800/50 cursor-pointer ${rowBg}`}
+                          >
                             <td className="py-1.5 px-2 text-zinc-600">{(page - 1) * pageSize + i + 1}</td>
+                            {/* Accuracy cell */}
+                            {activeSheet === "Baseline" && (
+                              <td className="py-1.5 px-2">
+                                <span className={`inline-block px-1.5 py-0.5 rounded text-[11px] font-mono font-medium ${accuracyColor(acc)} ${accuracyBg(acc)}`}>
+                                  {acc}%
+                                </span>
+                              </td>
+                            )}
+                            {/* Review Status cell */}
+                            {activeSheet === "Baseline" && (
+                              <td className="py-1.5 px-2">
+                                <Badge className={`${sCfg.cls} text-[10px] border px-1.5 py-0.5`}>{sCfg.label}</Badge>
+                              </td>
+                            )}
                             {displayColumns.map((col) => {
                               const val = row.data[col];
                               const display = val === null || val === undefined ? "" : String(val);

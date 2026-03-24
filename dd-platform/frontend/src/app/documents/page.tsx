@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -25,6 +25,15 @@ const DOC_TYPE_LABELS: Record<string, string> = {
 const FORMAT_ICONS: Record<string, string> = {
   pdf: "📄", xlsx: "📊", xls: "📊", csv: "📃", msg: "✉️", docx: "📝",
 };
+
+function useDebounce<T>(value: T, delay: number): T {
+  const [debounced, setDebounced] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setDebounced(value), delay);
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  return debounced;
+}
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return bytes + " B";
@@ -148,7 +157,8 @@ export default function DocumentsPage() {
   const [carriers, setCarriers] = useState<CarrierSummary[]>([]);
   const [docs, setDocs] = useState<CarrierDocs[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const search = useDebounce(searchInput, 300);
   const [selectedCarrier, setSelectedCarrier] = useState<string | null>(null);
   const [docTypeFilter, setDocTypeFilter] = useState<string>("all");
   const [previewFile, setPreviewFile] = useState<FileInfo | null>(null);
@@ -192,16 +202,25 @@ export default function DocumentsPage() {
     { key: "csr", label: "CSRs" },
   ];
 
-  // Filter carriers by search
+  // Filter carriers by search — match carrier name OR file name
+  const searchLower = search.toLowerCase();
   const visibleCarriers = carriers
     .filter((c) => c.total > 0)
-    .filter((c) => !search || c.name.toLowerCase().includes(search.toLowerCase()))
+    .filter((c) => {
+      if (!search) return true;
+      // Match carrier name
+      if (c.name.toLowerCase().includes(searchLower)) return true;
+      // Match any file name within this carrier
+      const files = getFilesForCarrier(c.name);
+      return files.some((f) => f.name.toLowerCase().includes(searchLower));
+    })
     .filter((c) => !selectedCarrier || c.name === selectedCarrier);
 
-  // Get all visible files
+  // Get all visible files — also filter individual files by search term
   const allVisibleFiles: (FileInfo & { carrierName: string })[] = visibleCarriers.flatMap((c) =>
     getFilesForCarrier(c.name)
       .filter((f) => docTypeFilter === "all" || f.doc_type === docTypeFilter)
+      .filter((f) => !search || f.name.toLowerCase().includes(searchLower) || c.name.toLowerCase().includes(searchLower))
       .map((f) => ({ ...f, carrierName: c.name }))
   );
 
@@ -258,8 +277,8 @@ export default function DocumentsPage() {
         <div className="flex-1 max-w-xs">
           <Input
             placeholder="Search files..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             className="bg-zinc-900 border-zinc-700 text-sm h-8"
           />
         </div>
@@ -312,7 +331,7 @@ export default function DocumentsPage() {
         allVisibleFiles.length === 0 ? (
           <div className="text-center py-16 text-zinc-500">
             <p className="text-lg mb-2">No files found</p>
-            <button onClick={() => { setSelectedCarrier(null); setDocTypeFilter("all"); setSearch(""); }}
+            <button onClick={() => { setSelectedCarrier(null); setDocTypeFilter("all"); setSearchInput(""); }}
               className="text-sm text-blue-400 hover:text-blue-300">Clear filters</button>
           </div>
         ) : (

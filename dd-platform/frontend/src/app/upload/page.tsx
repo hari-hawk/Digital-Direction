@@ -153,6 +153,21 @@ export default function UploadPage() {
     setCurrentFileName("");
     setFiles([]);
     setUploading(false);
+
+    // Show toast notification
+    const successCount = allResults.filter((r) => r.status === "uploaded").length;
+    const errorCount = allResults.filter((r) => r.status === "error").length;
+    if (errorCount > 0) {
+      toast.warning(
+        "Upload completed with errors",
+        `${successCount} files uploaded, ${errorCount} failed`
+      );
+    } else if (successCount > 0) {
+      toast.success(
+        "Upload complete",
+        `${successCount} file${successCount !== 1 ? "s" : ""} uploaded successfully`
+      );
+    }
   }
 
   // Formatters

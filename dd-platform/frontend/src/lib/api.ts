@@ -76,6 +76,23 @@ export interface InventoryRow {
   row_index: number;
   data: Record<string, unknown>;
   service_or_component: string;
+  accuracy?: number;
+  status?: string;
+  source_files?: string[];
+}
+
+export interface RowDetailField {
+  field_name: string;
+  field_value: unknown;
+}
+
+export interface RowDetailResponse {
+  row_index: number;
+  fields: RowDetailField[];
+  accuracy_score: number;
+  status: string;
+  comment: string;
+  source_documents: string[];
 }
 
 export interface ExtractionResult {
@@ -83,6 +100,39 @@ export interface ExtractionResult {
   summary: Record<string, unknown>;
   stdout: string;
   stderr: string;
+}
+
+export interface ExtractionStartResult {
+  task_id: string;
+  status: string;
+}
+
+export interface ExtractionTaskProgress {
+  task_id: string;
+  project_id: string;
+  carrier_key: string;
+  carrier_name: string;
+  status: string;
+  progress: number;
+  current_carrier: string;
+  elapsed_seconds: number;
+  result: { summary: Record<string, unknown>; stdout: string; stderr: string } | null;
+  error: string | null;
+  started_at: string;
+}
+
+export interface NotificationItem {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  timestamp: string;
+  read: boolean;
+}
+
+export interface NotificationsResponse {
+  notifications: NotificationItem[];
+  unread_count: number;
 }
 
 export interface InsightFlag {
@@ -185,13 +235,42 @@ export const api = {
     fetchApi<{ items: Record<string, string>[]; columns: string[] }>(`/projects/${projectId}/inventory/checklist`),
   updateChecklist: (projectId: string, items: Record<string, string>[]) =>
     postApi<{ status: string }>(`/projects/${projectId}/inventory/checklist`, { items }),
+  // Extraction — background task based
+  startExtraction: (projectId: string, carrierKey: string, apiKey?: string) =>
+    postApi<ExtractionStartResult>(`/projects/${projectId}/extract`, { carrier_key: carrierKey, api_key: apiKey }),
+  getExtractionTaskProgress: (projectId: string, taskId: string) =>
+    fetchApi<ExtractionTaskProgress>(`/projects/${projectId}/extraction/task/${taskId}`),
+  // Legacy synchronous extraction (kept for backward compat)
   runExtraction: (projectId: string, carrierKey: string, apiKey?: string) =>
     postApi<ExtractionResult>(`/projects/${projectId}/extract`, { carrier_key: carrierKey, api_key: apiKey }),
   getExtractionStatus: (projectId: string, carrierKey: string) =>
     fetchApi<Record<string, unknown>>(`/projects/${projectId}/extraction/status?carrier_key=${carrierKey}`),
   getExtractionCarriers: (projectId: string) =>
     fetchApi<{ key: string; name: string; tier: number; status: string }[]>(`/projects/${projectId}/extraction/carriers`),
+
+  // Notifications
+  getNotifications: (projectId: string) =>
+    fetchApi<NotificationsResponse>(`/projects/${projectId}/notifications`),
+  markNotificationRead: (projectId: string, notificationId: string) =>
+    postApi<{ status: string }>(`/projects/${projectId}/notifications/${notificationId}/read`, {}),
+  markAllNotificationsRead: (projectId: string) =>
+    postApi<{ status: string }>(`/projects/${projectId}/notifications/read-all`, {}),
+
+  // Auto-populate checklist
+  autoPopulateChecklist: (projectId: string) =>
+    postApi<{ items: Record<string, string>[]; auto_populated: number; total: number }>(
+      `/projects/${projectId}/inventory/checklist/auto-populate`, {}
+    ),
   getAccuracy: (projectId: string) => fetchApi<AccuracyResponse>(`/projects/${projectId}/accuracy`),
+  getRowDetail: (projectId: string, rowIndex: number, source?: string) =>
+    fetchApi<RowDetailResponse>(
+      `/projects/${projectId}/inventory/row-detail?row_index=${rowIndex}&source=${source || "reference"}`
+    ),
+  updateRowStatus: (projectId: string, rowIndex: number, status: string, comment: string) =>
+    postApi<{ status: string; row_index: number; new_status: string }>(
+      `/projects/${projectId}/inventory/row-status`,
+      { row_index: rowIndex, status, comment }
+    ),
   getInsights: (projectId: string) => fetchApi<InsightFlag[]>(`/projects/${projectId}/insights`),
   getCostBreakdown: (projectId: string) => fetchApi<CostBreakdown[]>(`/projects/${projectId}/insights/cost-breakdown`),
 
