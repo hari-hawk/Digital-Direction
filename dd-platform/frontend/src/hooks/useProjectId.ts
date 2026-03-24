@@ -6,18 +6,40 @@ const STORAGE_KEY = "dd_active_project";
 
 /**
  * Read the active project ID from localStorage AFTER mount.
- * Always returns DEFAULT_PROJECT during SSR and first render to prevent hydration mismatch.
+ * Returns { projectId, ready } — pages should wait for ready=true before loading data.
+ * This prevents the flash of default project data when switching projects.
  */
 export function useProjectId(): string {
   const [projectId, setProjectId] = useState(DEFAULT_PROJECT);
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    // Only read localStorage after mount (client-only)
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored && stored !== DEFAULT_PROJECT) {
+    if (stored) {
       setProjectId(stored);
     }
+    setReady(true);
   }, []);
 
+  // Return default during SSR, actual value after mount
   return projectId;
+}
+
+/**
+ * Enhanced hook that also returns readiness state.
+ * Use this when you need to prevent loading data for the wrong project.
+ */
+export function useProjectIdWithReady(): { projectId: string; ready: boolean } {
+  const [projectId, setProjectId] = useState(DEFAULT_PROJECT);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      setProjectId(stored);
+    }
+    setReady(true);
+  }, []);
+
+  return { projectId, ready };
 }

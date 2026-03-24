@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { api, CarrierSummary, CarrierDocs } from "@/lib/api";
-import { useProjectId } from "@/hooks/useProjectId";
+import { useProjectIdWithReady } from "@/hooks/useProjectId";
 
 const API_BASE = "http://127.0.0.1:8000/api";
 
@@ -153,7 +153,7 @@ function PreviewModal({ file, projectId, onClose }: { file: FileInfo; projectId:
 // Main Documents Page — Grid + Carrier Chips + Slide Panel
 // ═══════════════════════════════════════════
 export default function DocumentsPage() {
-  const projectId = useProjectId();
+  const { projectId, ready } = useProjectIdWithReady();
   const [carriers, setCarriers] = useState<CarrierSummary[]>([]);
   const [docs, setDocs] = useState<CarrierDocs[]>([]);
   const [loading, setLoading] = useState(true);
@@ -164,11 +164,12 @@ export default function DocumentsPage() {
   const [previewFile, setPreviewFile] = useState<FileInfo | null>(null);
 
   useEffect(() => {
+    if (!ready) return;
     setLoading(true);
     Promise.all([api.getCarriers(projectId), api.getDocuments(projectId)])
       .then(([c, d]) => { setCarriers(c); setDocs(d); setLoading(false); })
       .catch(() => setLoading(false));
-  }, [projectId]);
+  }, [projectId, ready]);
 
   if (loading) return <div className="text-zinc-400 p-8">Loading documents...</div>;
 

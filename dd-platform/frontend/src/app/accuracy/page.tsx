@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { api, AccuracyResponse, CarrierAccuracy, ColumnAccuracy, MismatchInfo, MissingCarrier } from "@/lib/api";
-import { useProjectId } from "@/hooks/useProjectId";
+import { useProjectIdWithReady } from "@/hooks/useProjectId";
 
 function accuracyColor(pct: number): string {
   if (pct >= 95) return "text-emerald-400";
@@ -38,12 +38,13 @@ function barColor(pct: number): string {
 }
 
 export default function AccuracyPage() {
-  const projectId = useProjectId();
+  const { projectId, ready } = useProjectIdWithReady();
   const [data, setData] = useState<AccuracyResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
+    if (!ready) return;
     setLoading(true);
     setError(null);
     try {
@@ -56,7 +57,7 @@ export default function AccuracyPage() {
       setError("Failed to load accuracy data");
     }
     setLoading(false);
-  }, [projectId]);
+  }, [projectId, ready]);
 
   useEffect(() => {
     loadData();

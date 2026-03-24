@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
-import { useProjectId } from "@/hooks/useProjectId";
+import { useProjectIdWithReady } from "@/hooks/useProjectId";
 import { toast } from "@/components/ui/toaster";
 
 interface UploadResult {
@@ -18,7 +18,7 @@ interface UploadResult {
 }
 
 export default function UploadPage() {
-  const projectId = useProjectId();
+  const { projectId, ready } = useProjectIdWithReady();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
 

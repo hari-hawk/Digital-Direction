@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { api, RowDetailResponse, ConfidenceSummary } from "@/lib/api";
-import { useProjectId } from "@/hooks/useProjectId";
+import { useProjectIdWithReady } from "@/hooks/useProjectId";
 
 interface SheetInfo { name: string; rows: number; cols: number }
 interface FilterState {
@@ -311,7 +311,7 @@ function RowDetailSlider({
 // Main Inventory Page
 // ═══════════════════════════════════════════
 export default function InventoryPage() {
-  const projectId = useProjectId();
+  const { projectId, ready } = useProjectIdWithReady();
   const [sheets, setSheets] = useState<SheetInfo[]>([]);
   const [activeSheet, setActiveSheet] = useState("Baseline");
   const [source, setSource] = useState<"reference" | "extracted">("reference");
@@ -349,6 +349,7 @@ export default function InventoryPage() {
 
   // Load project info on mount — determines if reference/extracted tabs are available
   useEffect(() => {
+    if (!ready) return;
     api.getProjectInfo(projectId).then((info) => {
       setProjectInfo(info);
       // Auto-set source based on what's available
@@ -366,7 +367,7 @@ export default function InventoryPage() {
         setProjectInfo({ has_reference: false, has_extracted: false, default_source: "none" });
       }
     });
-  }, [projectId]);
+  }, [projectId, ready]);
 
   // Sync debounced search into filters
   useEffect(() => {
@@ -379,6 +380,7 @@ export default function InventoryPage() {
 
   // Load sheets when source changes
   useEffect(() => {
+    if (!ready) return;
     api.getInventorySheets(projectId, source).then((d) => {
       const loadedSheets = d.sheets || [];
       setSheets(loadedSheets);

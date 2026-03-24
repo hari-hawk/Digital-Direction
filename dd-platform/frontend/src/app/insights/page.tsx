@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { api, InsightFlag, CostBreakdown } from "@/lib/api";
-import { useProjectId } from "@/hooks/useProjectId";
+import { useProjectIdWithReady } from "@/hooks/useProjectId";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 const SEVERITY_COLORS: Record<string, string> = {
@@ -23,18 +23,19 @@ function formatMoney(n: number) {
 }
 
 export default function InsightsPage() {
-  const projectId = useProjectId();
+  const { projectId, ready } = useProjectIdWithReady();
   const [insights, setInsights] = useState<InsightFlag[]>([]);
   const [costData, setCostData] = useState<CostBreakdown[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!ready) return;
     setLoading(true);
     Promise.all([api.getInsights(projectId), api.getCostBreakdown(projectId)])
       .then(([i, c]) => { setInsights(i); setCostData(c); setLoading(false); })
       .catch(() => setLoading(false));
-  }, [projectId]);
+  }, [projectId, ready]);
 
   if (loading) return <div className="text-zinc-400">Loading insights...</div>;
 

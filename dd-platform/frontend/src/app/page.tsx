@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { api, ProjectStats, CarrierSpend, ServiceTypeCount } from "@/lib/api";
-import { useProjectId } from "@/hooks/useProjectId";
+import { useProjectIdWithReady } from "@/hooks/useProjectId";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 
 const COLORS = ["#3b82f6", "#8b5cf6", "#06b6d4", "#10b981", "#f59e0b", "#ef4444", "#ec4899", "#6366f1", "#14b8a6", "#f97316"];
@@ -25,7 +25,7 @@ interface EnhancedData {
 }
 
 export default function Dashboard() {
-  const projectId = useProjectId();
+  const { projectId, ready } = useProjectIdWithReady();
   const [stats, setStats] = useState<ProjectStats | null>(null);
   const [spend, setSpend] = useState<CarrierSpend[]>([]);
   const [serviceTypes, setServiceTypes] = useState<ServiceTypeCount[]>([]);
@@ -33,6 +33,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!ready) return; // Wait for localStorage to be read
     setLoading(true);
     Promise.all([
       api.getStats(projectId),
@@ -46,7 +47,7 @@ export default function Dashboard() {
       setEnhanced(en);
       setLoading(false);
     }).catch(() => setLoading(false));
-  }, [projectId]);
+  }, [projectId, ready]);
 
   if (loading) return <div className="text-zinc-400 p-8">Loading dashboard...</div>;
   if (!stats) return <div className="text-red-400 p-8">Failed to load. Is the backend running on port 8000?</div>;
