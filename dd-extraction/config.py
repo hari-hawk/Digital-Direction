@@ -35,6 +35,16 @@ CARRIER_REGISTRY = {
         "contract_folder": "Charter",
         "tier": 1,
         "extractor": "charter",  # uses dedicated CharterExtractor
+        # Known Charter account numbers from reference file — used to filter
+        # the shared COMMS report which also contains Windstream data
+        "known_accounts": [
+            "057777701", "057778001", "065728001", "117931801",
+            "143371001", "145529301",
+            "8143 16 033 0055404", "8358 11 002 0022370",
+            "8358 21 062 0249975", "8358 21 114 0215710",
+            "8358 21 114 0292263", "8358 21 170 0107125",
+        ],
+        "parent_id": "216713099",  # The actual Charter parent in COMMS report
     },
     "windstream": {
         "display_name": "Windstream",
@@ -43,6 +53,7 @@ CARRIER_REGISTRY = {
         "contract_folder": "Windstream",
         "tier": 1,
         "extractor": "generic",
+        "parent_id": "2389882",  # Windstream parent in shared COMMS report
     },
     "granite": {
         "display_name": "Granite",

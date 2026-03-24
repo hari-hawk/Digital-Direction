@@ -56,19 +56,44 @@ def _get_row_status(project_id: str, row_index: int, accuracy: int) -> str:
     return "need_review"
 
 
-def _get_source_files(proj: dict) -> list[str]:
-    """Get list of source document filenames for the project."""
+def _get_source_files(proj: dict, carrier_name: str = "") -> list[str]:
+    """Get list of source document filenames for a specific carrier."""
     source_files: list[str] = []
-    output_dir = Path(proj.get("output_dir", ""))
-    if output_dir.exists():
-        for f in sorted(output_dir.glob("*_inventory_output.xlsx")):
-            source_files.append(f.name)
-    doc_dir = Path(proj.get("documents_dir", ""))
-    if doc_dir.exists():
-        for f in sorted(doc_dir.iterdir()):
-            if f.is_file() and f.suffix.lower() in (".pdf", ".xlsx", ".xls", ".csv", ".msg"):
-                source_files.append(f.name)
-    return source_files[:10]  # Limit to 10
+    input_dir = Path(proj.get("input_dir", ""))
+
+    if not input_dir.exists():
+        return source_files
+
+    # Search for carrier-specific files in input directories
+    carrier_lower = carrier_name.lower().strip() if carrier_name else ""
+    carrier_words = carrier_lower.split()[:2]  # First 2 words for matching
+
+    for category in ["Invoices", "Contracts", "Carrier Reports, Portal Data, ETC", "CSRs"]:
+        cat_dir = input_dir / category
+        if not cat_dir.exists():
+            continue
+
+        # Check carrier-named subfolders
+        for sub in cat_dir.iterdir():
+            if sub.is_dir():
+                sub_lower = sub.name.lower()
+                # Match carrier name against folder name
+                if carrier_words and any(w in sub_lower for w in carrier_words):
+                    for f in sorted(sub.iterdir()):
+                        if f.is_file() and f.suffix.lower() in (".pdf", ".xlsx", ".xls", ".csv", ".msg", ".docx"):
+                            doc_type = "Invoice" if "invoice" in category.lower() else \
+                                       "Contract" if "contract" in category.lower() else \
+                                       "Report" if "report" in category.lower() else "CSR"
+                            source_files.append(f"{doc_type}: {f.name}")
+            elif sub.is_file() and carrier_words:
+                # Check files directly in category folder
+                if any(w in sub.name.lower() for w in carrier_words):
+                    doc_type = "Invoice" if "invoice" in category.lower() else \
+                               "Contract" if "contract" in category.lower() else \
+                               "Report" if "report" in category.lower() else "CSR"
+                    source_files.append(f"{doc_type}: {sub.name}")
+
+    return source_files[:15]
 
 
 def _resolve_file(proj: dict, source: str) -> str:
@@ -189,14 +214,20 @@ async def list_inventory(
         )
 
         # Compute accuracy and review status for EVERY row
-        source_files = _get_source_files(proj)
         all_rows = full_result.get("rows", [])
+        # Cache source files per carrier to avoid repeated filesystem scans
+        _source_cache: dict = {}
+        carrier_col_name = next((c for c in (full_result.get("columns") or []) if c.strip().lower() == "carrier"), "Carrier")
         for row in all_rows:
             acc = _compute_row_accuracy(row.get("data", {}))
             row["accuracy"] = acc
             row_review = _get_row_status(project_id, row["row_index"], acc)
             row["status"] = row_review
-            row["source_files"] = source_files
+            # Get carrier-specific source files
+            row_carrier = str(row.get("data", {}).get(carrier_col_name, "")).strip()
+            if row_carrier not in _source_cache:
+                _source_cache[row_carrier] = _get_source_files(proj, row_carrier)
+            row["source_files"] = _source_cache[row_carrier]
 
         # Apply review_status filter AFTER accuracy computation
         if review_status:
@@ -538,7 +569,9 @@ async def get_row_detail(
     status = _get_row_status(project_id, row_index, accuracy)
     store = _row_status_store.get(project_id, {})
     comment = store.get(row_index, {}).get("comment", "")
-    source_files = _get_source_files(proj)
+    # Get carrier-specific source files
+    carrier_name = str(row_data.get("Carrier", row_data.get("Carrier ", ""))).strip()
+    source_files = _get_source_files(proj, carrier_name)
 
     return {
         "row_index": row_index,

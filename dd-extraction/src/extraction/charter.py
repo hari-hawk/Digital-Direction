@@ -164,9 +164,22 @@ class CharterExtractor(CarrierExtractor):
         )
 
     def _parse_carrier_report(self, report_dir: Path) -> tuple[list[dict], list[str]]:
-        """Parse the Customer Inventory by COMMS spreadsheet."""
+        """Parse the Customer Inventory by COMMS spreadsheet.
+
+        IMPORTANT: The COMMS report (Customer Inventory by COMMS - Golub Corporation.xlsx)
+        is a shared file containing data for BOTH Charter and Windstream:
+          - Parent ID 216713099 = Charter (4 rows)
+          - Parent ID 2389882  = Windstream (7,754 rows)
+        We MUST filter to only Charter rows to avoid misattributing Windstream data.
+        """
         warnings = []
         records = []
+
+        # Load known Charter accounts and parent ID from config for filtering
+        from config import CARRIER_REGISTRY
+        charter_cfg = CARRIER_REGISTRY.get("charter", {})
+        known_accounts = set(charter_cfg.get("known_accounts", []))
+        charter_parent_id = charter_cfg.get("parent_id", "216713099")
 
         # Find the carrier report file
         report_file = None
@@ -181,8 +194,9 @@ class CharterExtractor(CarrierExtractor):
 
         logger.info(f"Parsing carrier report: {report_file.name}")
         df = parse_excel(report_file, header_row=1)  # Headers on row 1 (row 0 is blank)
-        logger.info(f"Carrier report: {len(df)} records, columns: {list(df.columns)}")
+        logger.info(f"Carrier report: {len(df)} total records, columns: {list(df.columns)}")
 
+        skipped = 0
         for _, row in df.iterrows():
             record = {}
             for src_col, field_name in CARRIER_REPORT_COLUMNS.items():
@@ -197,7 +211,30 @@ class CharterExtractor(CarrierExtractor):
                         record[field_name] = s
                     else:
                         record[field_name] = None
-            records.append(record)
+
+            # --- Filter: only keep rows that belong to Charter ---
+            parent_id = record.get("master_account_ref", "") or ""
+            customer_num = record.get("account_number", "") or ""
+
+            is_charter = (
+                parent_id == charter_parent_id
+                or customer_num in known_accounts
+            )
+
+            if is_charter:
+                records.append(record)
+            else:
+                skipped += 1
+
+        if skipped > 0:
+            logger.info(
+                f"Charter filter: kept {len(records)} Charter rows, "
+                f"skipped {skipped} non-Charter rows (e.g. Windstream)"
+            )
+            warnings.append(
+                f"Shared COMMS report: filtered to {len(records)} Charter rows "
+                f"(skipped {skipped} rows belonging to other carriers)"
+            )
 
         return records, warnings
 

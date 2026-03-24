@@ -538,10 +538,37 @@ class GenericCarrierExtractor(CarrierExtractor):
             return rows, warnings, stats
 
         # 1. Load Customer Inventory by COMMS (primary: sites + circuits)
+        #    NOTE: The COMMS report may be a shared file containing data for
+        #    multiple carriers (e.g. both Windstream and Charter).
+        #    Filter to only Windstream rows using Parent ID from config.
         comms_records = self._load_report(
             report_dir, "customer inventory by comms", [".xlsx", ".xls"],
             sheet_name="Customer Inventory by COMMS"
         )
+        total_before_filter = len(comms_records)
+
+        # Filter to Windstream parent ID if configured
+        from config import CARRIER_REGISTRY
+        ws_parent_id = CARRIER_REGISTRY.get("windstream", {}).get("parent_id")
+        if ws_parent_id and total_before_filter > 0:
+            filtered = []
+            for rec in comms_records:
+                pid = str(rec.get("Parent ID") or "").strip()
+                if pid.endswith(".0"):
+                    pid = pid[:-2]
+                if pid == ws_parent_id or not pid:
+                    filtered.append(rec)
+            if len(filtered) < total_before_filter:
+                logger.info(
+                    f"Windstream COMMS filter: kept {len(filtered)} of "
+                    f"{total_before_filter} rows (Parent ID={ws_parent_id})"
+                )
+                warnings.append(
+                    f"Shared COMMS report: filtered to {len(filtered)} Windstream rows "
+                    f"(skipped {total_before_filter - len(filtered)} rows belonging to other carriers)"
+                )
+            comms_records = filtered
+
         stats["comms_records"] = len(comms_records)
         logger.info(f"Windstream COMMS records: {len(comms_records)}")
 
