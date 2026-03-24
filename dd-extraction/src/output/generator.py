@@ -60,6 +60,21 @@ def generate_inventory_excel(
     ws_tf = wb.create_sheet("TF DID")
     _write_tf_did_sheet(ws_tf)
 
+    # --- Additional template sheets (matching reference structure) ---
+    _write_template_sheet(wb, "Nextiva Hosted VOIP Data",
+        ["Name", "Number", "Extension", "Extension Email", "Group Id"])
+    _write_template_sheet(wb, "Inactive Services",
+        ["Status", "Notes", "Contract Info", "ADD/Modified Date", "Test Call Results"])
+    _write_template_sheet(wb, "Windstream Zero Cost Charge",
+        ["Status", "Notes", "Contract Info", "ADD/Modified Date", "Test Call Results"])
+    _write_template_sheet(wb, "Migrated Accounts",
+        ["Status", "Notes", "Contract Info", "ADD/Modified Date", "Test Call Results"])
+    _write_template_sheet(wb, "Account Tracking",
+        ["Carrier Account Number", "Carrier", "Current Monthly Charges", "Services", "Bill Date",
+         "Contract Begin", "Contract End", "Notes"])
+    _write_template_sheet(wb, " Checklist",
+        ["Checklist", "Agent - Yes/No", "QA - Yes/No"])
+
     # --- Apply data validation ---
     _apply_data_validation(wb["Baseline"], len(rows))
 
@@ -148,6 +163,19 @@ def _write_dropdowns_sheet(ws):
     # Adjust widths
     for col in range(1, 6):
         ws.column_dimensions[get_column_letter(col)].width = 25
+
+
+def _write_template_sheet(wb, sheet_name: str, headers: list):
+    """Create a template sheet with headers only (data populated during extraction)."""
+    ws = wb.create_sheet(sheet_name)
+    for col_idx, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_idx, value=header)
+        cell.font = HEADER_FONT
+        cell.fill = PatternFill("solid", fgColor="27272A")
+        cell.alignment = Alignment(horizontal="left")
+    # Auto-width
+    for col_idx in range(1, len(headers) + 1):
+        ws.column_dimensions[get_column_letter(col_idx)].width = 20
 
 
 def _write_tf_did_sheet(ws):
