@@ -256,6 +256,101 @@ async def inventory_columns(project_id: str, request: Request, sheet: str = "Bas
     return [{"name": col, "index": i} for i, col in enumerate(df.columns)]
 
 
+@router.get("/projects/{project_id}/inventory/confidence-summary")
+async def confidence_summary(project_id: str, request: Request, source: str = "reference"):
+    """Compute confidence summary across all inventory rows."""
+    proj = request.app.state.projects.get(project_id)
+    if not proj:
+        return {"error": "Project not found"}
+
+    empty_result = {
+        "total_rows": 0, "high": 0, "medium": 0, "needs_review": 0,
+        "high_pct": 0, "medium_pct": 0, "needs_review_pct": 0,
+        "high_mrc": 0, "medium_mrc": 0, "needs_review_mrc": 0,
+        "extraction_methods": [],
+    }
+
+    try:
+        file_path = _resolve_file(proj, source)
+        df = load_inventory(file_path)
+        if df.empty:
+            return empty_result
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Failed to load inventory for confidence: {e}")
+        return empty_result
+
+    total = len(df)
+    high = 0
+    medium = 0
+    needs_review = 0
+    high_mrc = 0.0
+    medium_mrc = 0.0
+    needs_review_mrc = 0.0
+
+    mrc_col = next((c for c in df.columns if "monthly recurring" in c.lower()), None)
+
+    for idx, row in df.iterrows():
+        row_data = {}
+        for col in df.columns:
+            val = row[col]
+            row_data[col] = None if pd.isna(val) else val
+        acc = _compute_row_accuracy(row_data)
+        raw_mrc = pd.to_numeric(row.get(mrc_col, 0), errors="coerce") if mrc_col else 0
+        mrc_val = float(raw_mrc) if pd.notna(raw_mrc) and not (isinstance(raw_mrc, float) and (raw_mrc != raw_mrc)) else 0.0
+
+        if acc >= 90:
+            high += 1
+            high_mrc += mrc_val
+        elif acc >= 70:
+            medium += 1
+            medium_mrc += mrc_val
+        else:
+            needs_review += 1
+            needs_review_mrc += mrc_val
+
+    # Extraction method breakdown
+    carrier_col = next((c for c in df.columns if c.lower() == "carrier"), None)
+    methods = []
+    if carrier_col and carrier_col in df.columns:
+        for carrier, group in df.groupby(carrier_col):
+            if pd.isna(carrier):
+                continue
+            carrier_rows = len(group)
+            carrier_mrc_raw = pd.to_numeric(group[mrc_col], errors="coerce").fillna(0).sum() if mrc_col else 0
+            carrier_mrc = float(carrier_mrc_raw) if pd.notna(carrier_mrc_raw) else 0.0
+            # Compute avg accuracy for this carrier
+            accs = []
+            for _, r in group.iterrows():
+                rd = {}
+                for c in df.columns:
+                    v = r[c]
+                    rd[c] = None if pd.isna(v) else v
+                accs.append(_compute_row_accuracy(rd))
+            avg_acc = sum(accs) / len(accs) if accs else 0
+            methods.append({
+                "carrier": str(carrier),
+                "rows": carrier_rows,
+                "mrc": round(carrier_mrc, 2),
+                "avg_confidence": round(avg_acc, 1),
+            })
+        methods.sort(key=lambda x: x["rows"], reverse=True)
+
+    return {
+        "total_rows": total,
+        "high": high,
+        "medium": medium,
+        "needs_review": needs_review,
+        "high_pct": round(high / total * 100, 1) if total > 0 else 0,
+        "medium_pct": round(medium / total * 100, 1) if total > 0 else 0,
+        "needs_review_pct": round(needs_review / total * 100, 1) if total > 0 else 0,
+        "high_mrc": round(high_mrc, 2),
+        "medium_mrc": round(medium_mrc, 2),
+        "needs_review_mrc": round(needs_review_mrc, 2),
+        "extraction_methods": methods[:15],
+    }
+
+
 @router.get("/projects/{project_id}/inventory/filters")
 async def inventory_filters(project_id: str, request: Request, source: str = "reference"):
     """Get unique filter values for dropdowns."""

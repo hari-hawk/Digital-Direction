@@ -135,6 +135,20 @@ export interface NotificationsResponse {
   unread_count: number;
 }
 
+export interface ConfidenceSummary {
+  total_rows: number;
+  high: number;
+  medium: number;
+  needs_review: number;
+  high_pct: number;
+  medium_pct: number;
+  needs_review_pct: number;
+  high_mrc: number;
+  medium_mrc: number;
+  needs_review_mrc: number;
+  extraction_methods: { carrier: string; rows: number; mrc: number; avg_confidence: number }[];
+}
+
 export interface InsightFlag {
   category: string;
   severity: string;
@@ -219,6 +233,8 @@ export const api = {
     const qs = sheet ? `?sheet=${encodeURIComponent(sheet)}` : "";
     return fetchApi<{ name: string; index: number }[]>(`/projects/${projectId}/inventory/columns${qs}`);
   },
+  getConfidenceSummary: (projectId: string, source?: string) =>
+    fetchApi<ConfidenceSummary>(`/projects/${projectId}/inventory/confidence-summary?source=${source || "extracted"}`),
   getInventorySheets: (projectId: string, source?: string) =>
     fetchApi<{ sheets: { name: string; rows: number; cols: number }[] }>(
       `/projects/${projectId}/inventory/sheets?source=${source || "reference"}`

@@ -78,14 +78,12 @@ export default function Sidebar() {
 
   // Render a static placeholder until client-side mount completes
   // This prevents the hydration mismatch between server and client
+  // IMPORTANT: No interactive components (NotificationBell etc) in this block
   if (!mounted) {
     return (
       <aside className="w-64 bg-zinc-900 border-r border-zinc-800 flex flex-col shrink-0">
         <div className="p-6 border-b border-zinc-800">
-          <div className="flex items-center justify-between">
-            <h1 className="text-lg font-bold text-white">Digital Direction</h1>
-            <NotificationBell />
-          </div>
+          <h1 className="text-lg font-bold text-white">Digital Direction</h1>
           <p className="text-xs text-zinc-400 mt-1">Inventory Platform</p>
         </div>
         <div className="mx-3 mt-3">

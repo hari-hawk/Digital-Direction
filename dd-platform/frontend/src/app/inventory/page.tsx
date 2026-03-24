@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { api, RowDetailResponse } from "@/lib/api";
+import { api, RowDetailResponse, ConfidenceSummary } from "@/lib/api";
 import { useProjectId } from "@/hooks/useProjectId";
 
 interface SheetInfo { name: string; rows: number; cols: number }
@@ -286,6 +286,7 @@ export default function InventoryPage() {
   const [checklistColumns, setChecklistColumns] = useState<string[]>([]);
   const [checklistLoading, setChecklistLoading] = useState(false);
   const [showAllColumns, setShowAllColumns] = useState(false);
+  const [confidence, setConfidence] = useState<ConfidenceSummary | null>(null);
 
   // Slider panel state
   const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null);
@@ -314,6 +315,7 @@ export default function InventoryPage() {
       }
     }).catch(() => {});
     api.getInventoryFilters(projectId, source).then(setFilterOptions).catch(() => {});
+    api.getConfidenceSummary(projectId, source).then(setConfidence).catch(() => {});
   }, [projectId, source]);
 
   // Load table data
@@ -502,6 +504,117 @@ export default function InventoryPage() {
           </a>
         </div>
       </div>
+
+      {/* Data Verification Dashboard */}
+      {confidence && confidence.total_rows > 0 && activeSheet === "Baseline" && (
+        <div className="mb-4">
+          {/* Confidence Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+            {/* High Confidence */}
+            <div className="p-4 rounded-xl border border-emerald-500/20 bg-emerald-950/20">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-5 h-5 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                  <span className="text-emerald-400 text-xs">✓</span>
+                </div>
+                <span className="text-xs font-semibold text-emerald-400 uppercase tracking-wide">High Confidence (90%+)</span>
+              </div>
+              <p className="text-2xl font-bold text-emerald-300">{confidence.high.toLocaleString()}</p>
+              <p className="text-xs text-emerald-400/60 mt-0.5">{confidence.high_pct}% of rows</p>
+              <div className="w-full bg-emerald-900/30 rounded-full h-1.5 mt-2">
+                <div className="bg-emerald-500 h-1.5 rounded-full" style={{ width: `${confidence.high_pct}%` }} />
+              </div>
+              <div className="mt-3 p-2 rounded-lg bg-emerald-900/20 border border-emerald-500/10">
+                <p className="text-[10px] font-semibold text-emerald-400 uppercase">No Action Needed</p>
+                <p className="text-[10px] text-emerald-400/60 mt-0.5">
+                  Data from structured sources. Auto-verified — values match source documents.
+                </p>
+              </div>
+            </div>
+
+            {/* Medium Confidence */}
+            <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-950/20">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-5 h-5 rounded-full bg-amber-500/20 flex items-center justify-center">
+                  <span className="text-amber-400 text-xs">!</span>
+                </div>
+                <span className="text-xs font-semibold text-amber-400 uppercase tracking-wide">Medium Confidence (70-89%)</span>
+              </div>
+              <p className="text-2xl font-bold text-amber-300">{confidence.medium.toLocaleString()}</p>
+              <p className="text-xs text-amber-400/60 mt-0.5">{confidence.medium_pct}% of rows</p>
+              <div className="w-full bg-amber-900/30 rounded-full h-1.5 mt-2">
+                <div className="bg-amber-500 h-1.5 rounded-full" style={{ width: `${confidence.medium_pct}%` }} />
+              </div>
+              <div className="mt-3 p-2 rounded-lg bg-amber-900/20 border border-amber-500/10">
+                <p className="text-[10px] font-semibold text-amber-400 uppercase">Spot Check Recommended</p>
+                <p className="text-[10px] text-amber-400/60 mt-0.5">
+                  Data from AI extraction or generated rollups. Sample 10-20% and verify against source files.
+                </p>
+              </div>
+            </div>
+
+            {/* Needs Review */}
+            <div className="p-4 rounded-xl border border-red-500/20 bg-red-950/20">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-5 h-5 rounded-full bg-red-500/20 flex items-center justify-center">
+                  <span className="text-red-400 text-xs">✕</span>
+                </div>
+                <span className="text-xs font-semibold text-red-400 uppercase tracking-wide">Needs Review (&lt;70%)</span>
+              </div>
+              <p className="text-2xl font-bold text-red-300">{confidence.needs_review.toLocaleString()}</p>
+              <p className="text-xs text-red-400/60 mt-0.5">{confidence.needs_review_pct}% of rows</p>
+              <div className="w-full bg-red-900/30 rounded-full h-1.5 mt-2">
+                <div className="bg-red-500 h-1.5 rounded-full" style={{ width: `${confidence.needs_review_pct}%` }} />
+              </div>
+              <div className="mt-3 p-2 rounded-lg bg-red-900/20 border border-red-500/10">
+                <p className="text-[10px] font-semibold text-red-400 uppercase">Manual Verification Required</p>
+                <p className="text-[10px] text-red-400/60 mt-0.5">
+                  Review every row. Open source file, find matching data, confirm or correct values.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Data Source & Confidence Table */}
+          {confidence.extraction_methods.length > 0 && (
+            <Card className="bg-zinc-900 border-zinc-800">
+              <CardHeader className="py-3">
+                <CardTitle className="text-xs text-zinc-400">Data Source & Confidence</CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-zinc-800 text-zinc-500 uppercase text-[10px]">
+                      <th className="text-left py-2">Carrier</th>
+                      <th className="text-right py-2">Rows</th>
+                      <th className="text-right py-2">Spend</th>
+                      <th className="text-right py-2">Avg Confidence</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {confidence.extraction_methods.map((m) => (
+                      <tr key={m.carrier} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
+                        <td className="py-1.5 text-zinc-300">{m.carrier}</td>
+                        <td className="text-right py-1.5 text-zinc-400 font-mono">{m.rows.toLocaleString()}</td>
+                        <td className="text-right py-1.5 text-zinc-400 font-mono">
+                          ${m.mrc.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="text-right py-1.5 font-mono">
+                          <span className={
+                            m.avg_confidence >= 90 ? "text-emerald-400" :
+                            m.avg_confidence >= 70 ? "text-amber-400" : "text-red-400"
+                          }>
+                            {m.avg_confidence}%
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
 
       {/* Sheet Tabs */}
       <div className="flex gap-1 mb-4 overflow-x-auto pb-2 border-b border-zinc-800">
