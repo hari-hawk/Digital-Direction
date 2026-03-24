@@ -1,21 +1,21 @@
 {
   "total_carriers": 23,
-  "total_rows": 6542,
-  "processing_time_seconds": 476.44,
+  "total_rows": 7274,
+  "processing_time_seconds": 21.62,
   "carrier_summaries": [
     {
       "carrier": "Charter Communications",
       "carrier_key": "charter",
-      "total_rows": 1373,
+      "total_rows": 1369,
       "row_stats": {
-        "total": 1373,
-        "S": 156,
+        "total": 1369,
+        "S": 206,
         "C": 1163,
         "U": 0,
-        "T\\S\\OCC": 54,
+        "T\\S\\OCC": 0,
         "unclassified": 0
       },
-      "processing_time_seconds": 461.07,
+      "processing_time_seconds": 2.48,
       "output_file": "outputs/charter_inventory_output.xlsx",
       "warnings_count": 1,
       "errors_count": 0
@@ -23,16 +23,16 @@
     {
       "carrier": "Windstream",
       "carrier_key": "windstream",
-      "total_rows": 713,
+      "total_rows": 1449,
       "row_stats": {
-        "total": 713,
-        "S": 155,
-        "C": 558,
+        "total": 1449,
+        "S": 732,
+        "C": 717,
         "U": 0,
         "T\\S\\OCC": 0,
         "unclassified": 0
       },
-      "processing_time_seconds": 3.38,
+      "processing_time_seconds": 7.0,
       "output_file": "outputs/windstream_inventory_output.xlsx",
       "warnings_count": 0,
       "errors_count": 0
@@ -49,7 +49,7 @@
         "T\\S\\OCC": 0,
         "unclassified": 0
       },
-      "processing_time_seconds": 2.11,
+      "processing_time_seconds": 3.72,
       "output_file": "outputs/granite_inventory_output.xlsx",
       "warnings_count": 0,
       "errors_count": 0
@@ -66,7 +66,7 @@
         "T\\S\\OCC": 0,
         "unclassified": 0
       },
-      "processing_time_seconds": 1.54,
+      "processing_time_seconds": 1.51,
       "output_file": "outputs/peerless_inventory_output.xlsx",
       "warnings_count": 0,
       "errors_count": 0
@@ -83,7 +83,7 @@
         "T\\S\\OCC": 0,
         "unclassified": 0
       },
-      "processing_time_seconds": 0.19,
+      "processing_time_seconds": 0.17,
       "output_file": "outputs/consolidated_inventory_output.xlsx",
       "warnings_count": 0,
       "errors_count": 0
@@ -100,7 +100,7 @@
         "T\\S\\OCC": 0,
         "unclassified": 0
       },
-      "processing_time_seconds": 0.04,
+      "processing_time_seconds": 0.03,
       "output_file": "outputs/spectrotel_inventory_output.xlsx",
       "warnings_count": 0,
       "errors_count": 0
@@ -185,7 +185,7 @@
         "T\\S\\OCC": 0,
         "unclassified": 0
       },
-      "processing_time_seconds": 0.79,
+      "processing_time_seconds": 0.55,
       "output_file": "outputs/nextiva_inventory_output.xlsx",
       "warnings_count": 0,
       "errors_count": 0

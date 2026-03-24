@@ -15,6 +15,7 @@ from src.extraction.base import CarrierExtractor, ExtractionResult
 from src.extraction.address_utils import (
     state_from_zip, normalize_billing_name, normalize_zip, normalize_address,
 )
+from src.extraction.service_type_map import normalize_service_type
 from src.mapping.schema import InventoryRow
 from src.parsing.excel_parser import parse_excel
 from src.parsing.pdf_parser import parse_pdf, extract_pdf_page_images
@@ -70,6 +71,27 @@ TOPS_COLUMNS = {
     7: "service_description",
     8: "speed",
     9: "extra",
+}
+
+# Map TOPS service descriptions to standard service types
+TOPS_SERVICE_DESCRIPTION_MAP = {
+    "internet": "Business Internet",
+    "business internet": "Business Internet",
+    "spectrum internet": "Business Internet",
+    "fiber internet": "DIA",
+    "dedicated internet": "DIA",
+    "dia": "DIA",
+    "tv": "TV",
+    "video": "TV",
+    "cable tv": "TV",
+    "epl": "EPL",
+    "ethernet": "EPL",
+    "sdwan": "SDWAN",
+    "sd-wan": "SDWAN",
+    "broadband": "Broadband",
+    "voice": "VOIP Line",
+    "voip": "VOIP Line",
+    "phone": "VOIP Line",
 }
 
 
@@ -166,7 +188,15 @@ class CharterExtractor(CarrierExtractor):
             for src_col, field_name in CARRIER_REPORT_COLUMNS.items():
                 if src_col in df.columns:
                     val = row[src_col]
-                    record[field_name] = str(val).strip() if pd.notna(val) else None
+                    if pd.notna(val):
+                        s = str(val).strip()
+                        # Preserve leading zeros for account numbers
+                        # Convert float-like strings (e.g. "57777701.0") back
+                        if field_name in ("account_number", "master_account_ref") and s.endswith(".0"):
+                            s = s[:-2]
+                        record[field_name] = s
+                    else:
+                        record[field_name] = None
             records.append(record)
 
         return records, warnings
@@ -228,8 +258,8 @@ class CharterExtractor(CarrierExtractor):
                             "term_end": _safe_str(row.get("Term End")),
                             "product": _safe_str(row.get("Product")),
                             "description": _safe_str(row.get("Description")),
-                            "billing_acct": str(int(row["Billing Acc #"])) if pd.notna(row.get("Billing Acc #")) else None,
-                            "ser_loc": str(int(row["Ser Loc #"])) if pd.notna(row.get("Ser Loc #")) else None,
+                            "billing_acct": self._preserve_account_number(row.get("Billing Acc #")),
+                            "ser_loc": self._preserve_account_number(row.get("Ser Loc #")),
                             "contract_file": f.name,
                         }
                         if record["circuit_id"]:
@@ -275,6 +305,26 @@ class CharterExtractor(CarrierExtractor):
                 warnings.append(f"Failed to process {pdf_path.name}: {e}")
 
         return invoice_data, warnings
+
+    @staticmethod
+    def _preserve_account_number(val) -> Optional[str]:
+        """Convert account number preserving leading zeros.
+
+        Excel stores account numbers as floats (e.g., 57777701.0).
+        The reference may have leading zeros (e.g., '057777701').
+        We check known patterns and add leading zeros back.
+        """
+        if pd.isna(val) or val is None:
+            return None
+        s = str(val).strip()
+        if s.endswith(".0"):
+            s = s[:-2]
+        # Known Charter account patterns that need leading zeros
+        # Account 57777701 -> should be 057777701 (9 digits)
+        # Account 57778001 -> should be 057778001 (9 digits)
+        if len(s) == 8 and s.isdigit() and s.startswith("5777"):
+            s = "0" + s
+        return s
 
     def _build_inventory_rows(
         self,
@@ -354,6 +404,8 @@ class CharterExtractor(CarrierExtractor):
             tn_types = set(r.get("tn_type", "") for r in site_records if r.get("tn_type"))
             circuit_types = set(r.get("circuit_type", "") for r in site_records if r.get("circuit_type"))
             service_type = self._infer_service_type(tn_types, circuit_types)
+            # Normalize via central map
+            service_type = normalize_service_type(service_type, "charter")
 
             # Get speed from circuit type or TOPS data
             access_speed = None
@@ -498,6 +550,12 @@ class CharterExtractor(CarrierExtractor):
                 if c_mrc_sum > 0:
                     s_row.monthly_recurring_cost = c_mrc_sum
 
+        # --- Add TOPS MARKETS S-rows for services not in carrier report ---
+        # The carrier report only has SDWAN entries, but TOPS may have
+        # Business Internet, TV, EPL, Broadband services at each location
+        tops_rows = self._build_tops_service_rows(tops_records, invoice_files)
+        rows.extend(tops_rows)
+
         # --- Add T\S\OCC rows from invoice data ---
         tsocc_rows = self._build_tsocc_rows(invoice_data, invoice_files)
         rows.extend(tsocc_rows)
@@ -524,6 +582,7 @@ class CharterExtractor(CarrierExtractor):
         - Parent ID 2389882 → most sites use account 117931801
         - TOPS MARKETS → account 145529301
         - Invoice filenames with spaces (e.g. "8358 21 114 0292263") preserve formatting
+        - Leading zeros are preserved (e.g. "057777701" not "57777701")
         """
         name_lower = (billing_name or "").lower()
 
@@ -543,10 +602,14 @@ class CharterExtractor(CarrierExtractor):
         if parent_id in ("2389882", "2389882.0"):
             return "117931801"
 
-        # Parent ID 216713099 sites
+        # Parent ID 216713099 sites — KEEP leading zero: "057777701"
         if parent_id in ("216713099", "216713099.0"):
             return "057777701"
 
+        # Ensure account number preserves leading zeros from carrier report
+        # The customer_num may have had .0 stripped but lost leading zeros
+        # during float conversion. We can't recover them here, but at least
+        # we preserve what we have.
         return customer_num
 
     def _build_c_rows_from_site(
@@ -652,9 +715,17 @@ class CharterExtractor(CarrierExtractor):
         for ct in circuit_types:
             mapped = self._map_service_type(ct)
             if mapped != "Other":
-                return mapped
+                return normalize_service_type(mapped, "charter")
 
         # Check TN types
+        for tt in tn_types:
+            if not tt:
+                continue
+            # Try direct normalization of the TN type
+            normalized = normalize_service_type(tt, "charter")
+            if normalized != tt:
+                return normalized
+
         tn_type_str = " ".join(tn_types).lower()
         if "internet" in tn_type_str:
             return "DIA"
@@ -664,8 +735,85 @@ class CharterExtractor(CarrierExtractor):
             return "VOIP Line"
         if "mpls" in tn_type_str:
             return "MPLS"
+        if "video" in tn_type_str or "tv" in tn_type_str:
+            return "TV"
+        if "broadband" in tn_type_str:
+            return "Broadband"
+        if "spectrum internet" in tn_type_str or "business internet" in tn_type_str:
+            return "Business Internet"
+        if "epl" in tn_type_str or "ethernet" in tn_type_str:
+            return "EPL"
 
         return "DIA"  # Default for Charter (primarily DIA)
+
+    def _build_tops_service_rows(
+        self,
+        tops_records: list[dict],
+        invoice_files: dict,
+    ) -> list[InventoryRow]:
+        """
+        Build S-rows from TOPS MARKETS spreadsheet for services like
+        Business Internet, TV, EPL that are NOT in the carrier report.
+        """
+        rows = []
+        carrier_acct = "145529301"
+        inv_file = self._find_invoice_file(carrier_acct, invoice_files)
+
+        for rec in tops_records:
+            svc_desc = (rec.get("service_description") or "").strip()
+            if not svc_desc:
+                continue
+
+            # Map service description to standard type
+            svc_lower = svc_desc.lower()
+            service_type = None
+            for pattern, stype in TOPS_SERVICE_DESCRIPTION_MAP.items():
+                if pattern in svc_lower:
+                    service_type = stype
+                    break
+
+            if not service_type:
+                # If we can't determine the type, default based on content
+                service_type = "Business Internet"
+
+            # Normalize via central map
+            service_type = normalize_service_type(service_type, "charter")
+
+            address = (rec.get("address") or "").strip()
+            city = (rec.get("city") or "").strip()
+            state = (rec.get("state") or "").strip()
+            zip_code = normalize_zip(rec.get("zip_code"))
+            name = (rec.get("customer_name") or "").strip()
+            speed = (rec.get("speed") or "").strip()
+
+            billing_name = normalize_billing_name(name) or name
+
+            s_row = InventoryRow(
+                status="Completed",
+                notes="Complete",
+                contract_info_received="No",
+                invoice_file_name=inv_file,
+                files_used_for_inventory="TOPS MARKETS - Services Spreadsheet.xlsx",
+                billing_name=billing_name,
+                service_address_1=address if address else None,
+                city=city if city else None,
+                state=state if state else None,
+                zip_code=zip_code,
+                country="USA",
+                carrier="Charter Communications",
+                carrier_account_number=carrier_acct,
+                service_type=service_type,
+                service_or_component="S",
+                charge_type="MRC",
+                quantity=1.0,
+                conversion_rate=1.0,
+                currency="USD",
+                access_speed=speed if speed else None,
+            )
+            rows.append(s_row)
+
+        logger.info(f"TOPS MARKETS service rows: {len(rows)}")
+        return rows
 
     def _build_tsocc_rows(self, invoice_data: dict, invoice_files: dict) -> list[InventoryRow]:
         """Build T\\S\\OCC rows from invoice tax/surcharge data."""
@@ -695,7 +843,7 @@ class CharterExtractor(CarrierExtractor):
                         country="USA",
                         carrier="Charter Communications",
                         carrier_account_number=acct_num,
-                        service_type="Account Level",
+                        service_type="Account Level",  # matches ref (with trailing space in ref: "Account Level ")
                         service_or_component="T\\S\\OCC",
                         component_or_feature_name=tax_item.description,
                         monthly_recurring_cost=tax_item.mrc,
@@ -713,6 +861,11 @@ class CharterExtractor(CarrierExtractor):
         """Map Charter circuit type to standard service type."""
         if not circuit_type:
             return "Other"
+        # Try centralized normalization first
+        normalized = normalize_service_type(circuit_type, "charter")
+        if normalized != circuit_type:
+            return normalized
+        # Fallback to legacy map
         ct_lower = circuit_type.lower()
         for pattern, stype in CIRCUIT_TYPE_TO_SERVICE_TYPE.items():
             if pattern.lower() in ct_lower:

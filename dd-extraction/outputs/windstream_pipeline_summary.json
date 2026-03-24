@@ -1,11 +1,11 @@
 {
   "carrier": "Windstream",
   "carrier_key": "windstream",
-  "total_rows": 713,
+  "total_rows": 875,
   "row_stats": {
-    "total": 713,
-    "S": 155,
-    "C": 558,
+    "total": 875,
+    "S": 158,
+    "C": 717,
     "U": 0,
     "T\\S\\OCC": 0,
     "unclassified": 0
@@ -22,11 +22,11 @@
       },
       "Required columns populated": {
         "passed": false,
-        "violations": 299
+        "violations": 316
       },
       "Service Type in dropdown": {
         "passed": false,
-        "violations": 653
+        "violations": 262
       },
       "Charge Type in dropdown": {
         "passed": true,
@@ -42,7 +42,7 @@
       },
       "No orphan C-rows": {
         "passed": false,
-        "violations": 131
+        "violations": 274
       },
       "Billing Name not blank": {
         "passed": true,
@@ -59,15 +59,15 @@
     }
   },
   "confidence": {
-    "total_populated_fields": 13824,
-    "high": 7389,
-    "medium": 6435,
+    "total_populated_fields": 16692,
+    "high": 9084,
+    "medium": 7608,
     "low": 0,
-    "high_pct": 53.5,
-    "medium_pct": 46.5,
+    "high_pct": 54.4,
+    "medium_pct": 45.6,
     "low_pct": 0.0
   },
-  "processing_time_seconds": 3.92,
+  "processing_time_seconds": 7.57,
   "output_file": "outputs/windstream_inventory_output.xlsx",
   "warnings_count": 0,
   "errors_count": 0

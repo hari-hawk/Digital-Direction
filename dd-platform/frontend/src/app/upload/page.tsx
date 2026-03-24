@@ -30,6 +30,13 @@ export default function UploadPage() {
   const [results, setResults] = useState<UploadResult[]>([]);
   const [dragActive, setDragActive] = useState(false);
 
+  // Timeline state
+  const [currentFileIndex, setCurrentFileIndex] = useState(0);
+  const [currentFileName, setCurrentFileName] = useState("");
+  const [startTime, setStartTime] = useState(0);
+  const [elapsedMs, setElapsedMs] = useState(0);
+  const [estimatedTotalMs, setEstimatedTotalMs] = useState(0);
+
   // Handle file selection
   function handleFiles(fileList: FileList | null) {
     if (!fileList) return;
@@ -85,19 +92,35 @@ export default function UploadPage() {
     setDocType("");
   }
 
-  // Upload
+  // Upload with timeline tracking
   async function handleUpload() {
     if (files.length === 0) return;
     setUploading(true);
     setProgress(0);
     setResults([]);
+    setCurrentFileIndex(0);
+    setCurrentFileName(files[0]?.name || "");
+    const t0 = Date.now();
+    setStartTime(t0);
+    setElapsedMs(0);
+    setEstimatedTotalMs(0);
 
     const allResults: UploadResult[] = [];
 
-    // Upload files individually for better progress tracking
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      setProgress(Math.round(((i) / files.length) * 100));
+      const pct = Math.round((i / files.length) * 100);
+      setProgress(pct);
+      setCurrentFileIndex(i);
+      setCurrentFileName(file.name);
+
+      // Update elapsed and estimate
+      const elapsed = Date.now() - t0;
+      setElapsedMs(elapsed);
+      if (i > 0) {
+        const avgPerFile = elapsed / i;
+        setEstimatedTotalMs(avgPerFile * files.length);
+      }
 
       try {
         const res = await api.uploadBulk(
@@ -119,20 +142,32 @@ export default function UploadPage() {
         });
       }
 
-      // Update results as we go
       setResults([...allResults]);
     }
 
+    const totalElapsed = Date.now() - t0;
+    setElapsedMs(totalElapsed);
+    setEstimatedTotalMs(totalElapsed);
     setProgress(100);
+    setCurrentFileName("");
     setFiles([]);
     setUploading(false);
   }
 
-  // File size formatter
+  // Formatters
   function fmtSize(bytes: number): string {
     if (bytes < 1024) return bytes + " B";
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
     return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  }
+
+  function fmtTime(ms: number): string {
+    if (ms < 1000) return "< 1s";
+    const secs = Math.floor(ms / 1000);
+    if (secs < 60) return `${secs}s`;
+    const mins = Math.floor(secs / 60);
+    const remSecs = secs % 60;
+    return `${mins}m ${remSecs}s`;
   }
 
   const totalSize = files.reduce((s, f) => s + f.size, 0);
@@ -320,13 +355,67 @@ export default function UploadPage() {
                 )}
               </button>
 
-              {/* Progress bar */}
+              {/* Upload Timeline */}
               {uploading && (
-                <div className="w-full bg-zinc-800 rounded-full h-2 mt-2 overflow-hidden">
-                  <div
-                    className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${progress}%` }}
-                  />
+                <div className="mt-3 space-y-2">
+                  {/* Progress bar */}
+                  <div className="w-full bg-zinc-800 rounded-full h-2.5 overflow-hidden">
+                    <div
+                      className="bg-blue-500 h-2.5 rounded-full transition-all duration-300 relative"
+                      style={{ width: `${progress}%` }}
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent to-blue-400/30 animate-pulse" />
+                    </div>
+                  </div>
+
+                  {/* Current file */}
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                    <span className="text-xs text-zinc-300 truncate flex-1">
+                      {currentFileName}
+                    </span>
+                    <span className="text-xs text-zinc-500">
+                      {currentFileIndex + 1} / {files.length + results.length}
+                    </span>
+                  </div>
+
+                  {/* Time estimates */}
+                  <div className="flex justify-between text-[10px] text-zinc-500">
+                    <span>Elapsed: {fmtTime(elapsedMs)}</span>
+                    {estimatedTotalMs > 0 && (
+                      <span>
+                        ETA: {fmtTime(Math.max(0, estimatedTotalMs - elapsedMs))}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Per-file timeline */}
+                  {results.length > 0 && (
+                    <div className="max-h-[120px] overflow-auto space-y-0.5 mt-1">
+                      {results.map((r, i) => (
+                        <div key={i} className="flex items-center gap-1.5 text-[10px]">
+                          <span>{r.status === "uploaded" ? "✅" : "❌"}</span>
+                          <span className="text-zinc-400 truncate flex-1">{r.file}</span>
+                          <span className="text-zinc-600">{r.doc_type}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Completed summary */}
+              {!uploading && progress === 100 && results.length > 0 && (
+                <div className="mt-3 p-3 bg-emerald-900/20 border border-emerald-500/20 rounded-lg">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-emerald-400">✓</span>
+                    <span className="text-sm text-emerald-300 font-medium">Upload Complete</span>
+                  </div>
+                  <p className="text-xs text-zinc-400">
+                    {successCount} file{successCount !== 1 ? "s" : ""} uploaded
+                    {errorCount > 0 && <span className="text-red-400"> · {errorCount} failed</span>}
+                    {" · "}{fmtTime(elapsedMs)}
+                  </p>
                 </div>
               )}
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 """Accuracy router: compare extracted data vs reference data."""
 import logging
+import sys
 from pathlib import Path
 
 import pandas as pd
@@ -11,6 +12,46 @@ logger = logging.getLogger(__name__)
 
 # Key columns used to build composite match key
 KEY_COLUMNS = ["Carrier", "Carrier Account Number", "Service Type", "Service or Component", "Service Address 1"]
+
+# ---------------------------------------------------------------------------
+# Service Type Normalization for Matching
+# ---------------------------------------------------------------------------
+# Map common service type variants to canonical names so that
+# extracted "SDWAN" matches reference "SDWAN", "Account Level " matches
+# "Account Level", etc.
+SERVICE_TYPE_ALIASES = {
+    "dia": "dia",
+    "sdwan": "sdwan",
+    "sd-wan": "sdwan",
+    "ucaas": "ucaas",
+    "voip line": "voip line",
+    "voip": "voip line",
+    "pots": "pots",
+    "sip trunk": "sip trunk",
+    "isdn pri": "isdn pri",
+    "epl": "epl",
+    "evpl": "evpl",
+    "broadband": "broadband",
+    "centrex": "centrex",
+    "tv": "tv",
+    "business internet": "business internet",
+    "wireless cellular internet": "wireless cellular internet",
+    "account level": "account level",
+    "account level ": "account level",  # trailing space in reference
+    "rcf": "rcf",
+    "long distance": "long distance",
+    "usage": "usage",
+    "did": "did",
+    "other": "other",
+    "mpls": "mpls",
+    "ethernet": "ethernet",
+}
+
+
+def _normalize_service_type(st: str) -> str:
+    """Normalize service type for matching."""
+    st = st.lower().strip()
+    return SERVICE_TYPE_ALIASES.get(st, st)
 
 
 def _find_col(columns: list[str], target: str) -> str | None:
@@ -47,11 +88,16 @@ def _normalize_address(addr: str) -> str:
 
 
 def _normalize_account(acct: str) -> str:
-    """Normalize account number for matching."""
-    # Strip spaces, dashes, leading zeros (but keep at least 1 digit)
-    acct = acct.lower().strip().replace(" ", "").replace("-", "")
-    # Remove leading zeros
-    acct = acct.lstrip("0") or "0"
+    """Normalize account number for matching.
+
+    IMPORTANT: We do NOT strip leading zeros because some carriers
+    (e.g., Charter "057777701") use them as part of the account ID.
+    Stripping them causes false mismatches.
+    """
+    acct = acct.strip().replace(" ", "").replace("-", "").lower()
+    # Remove trailing .0 from float conversion
+    if acct.endswith(".0"):
+        acct = acct[:-2]
     return acct
 
 
@@ -69,6 +115,8 @@ def _build_key(row: pd.Series, col_map: dict[str, str]) -> str:
                 val = _normalize_address(val)
             elif "account" in key_col.lower():
                 val = _normalize_account(val)
+            elif "service type" in key_col.lower():
+                val = _normalize_service_type(val)
         else:
             val = ""
         parts.append(val)

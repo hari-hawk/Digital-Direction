@@ -1,20 +1,20 @@
 {
   "carrier": "Charter Communications",
   "carrier_key": "charter",
-  "total_rows": 1376,
+  "total_rows": 1369,
   "row_stats": {
-    "total": 1376,
-    "S": 156,
+    "total": 1369,
+    "S": 206,
     "C": 1163,
     "U": 0,
-    "T\\S\\OCC": 57,
+    "T\\S\\OCC": 0,
     "unclassified": 0
   },
   "qa_passed": false,
   "qa_summary": {
     "total_rules": 10,
-    "passed": 7,
-    "failed": 3,
+    "passed": 8,
+    "failed": 2,
     "rules": {
       "S-row MRC = sum(C-row MRCs)": {
         "passed": false,
@@ -22,7 +22,7 @@
       },
       "Required columns populated": {
         "passed": false,
-        "violations": 84
+        "violations": 40
       },
       "Service Type in dropdown": {
         "passed": true,
@@ -45,8 +45,8 @@
         "violations": 0
       },
       "Billing Name not blank": {
-        "passed": false,
-        "violations": 16
+        "passed": true,
+        "violations": 0
       },
       "Currency = USD": {
         "passed": true,
@@ -59,15 +59,15 @@
     }
   },
   "confidence": {
-    "total_populated_fields": 36066,
-    "high": 16469,
-    "medium": 19282,
+    "total_populated_fields": 36111,
+    "high": 16587,
+    "medium": 19209,
     "low": 315,
-    "high_pct": 45.7,
-    "medium_pct": 53.5,
+    "high_pct": 45.9,
+    "medium_pct": 53.2,
     "low_pct": 0.9
   },
-  "processing_time_seconds": 470.56,
+  "processing_time_seconds": 3.28,
   "output_file": "outputs/charter_inventory_output.xlsx",
   "warnings_count": 1,
   "errors_count": 0

@@ -15,6 +15,7 @@ from typing import Optional
 import pandas as pd
 
 from src.extraction.base import CarrierExtractor, ExtractionResult
+from src.extraction.service_type_map import normalize_service_type
 from src.mapping.schema import InventoryRow
 
 logger = logging.getLogger(__name__)
@@ -607,10 +608,13 @@ class GenericCarrierExtractor(CarrierExtractor):
                     "circuits": [],
                     "tns": [],
                     "circuit_types": set(),
+                    "tn_types": set(),  # Track TN types for service classification
                 }
             site = sites[site_key]
             if circuit_type:
                 site["circuit_types"].add(circuit_type)
+            if tn_type:
+                site["tn_types"].add(tn_type)
             if circuit_id:
                 site["circuits"].append({
                     "circuit_id": circuit_id,
@@ -660,37 +664,20 @@ class GenericCarrierExtractor(CarrierExtractor):
             zip_code = _normalize_zip(site["zip_code"])
             name = site["name"]
 
-            # Determine service type from circuit types at this site
-            service_type = self._windstream_service_type(site["circuit_types"])
-
-            # Create S-row (service row)
-            s_row = InventoryRow(
-                status="In Progress",
-                carrier=self._carrier_name,
-                carrier_account_number=main_account if parent == main_account else acct,
-                sub_account_number=acct if acct != main_account else None,
-                billing_name=name,
-                service_address_1=addr.title() if addr else None,
-                city=city.title() if city else None,
-                state=state.upper() if state else None,
-                zip_code=zip_code,
-                country="USA",
-                service_type=service_type,
-                service_or_component="S",
-                charge_type="MRC",
-                quantity=1.0,
-                conversion_rate=1.0,
-                currency="USD",
+            # Determine ALL service types present at this site (from circuit types AND TN types)
+            site_service_types = self._windstream_all_service_types(
+                site["circuit_types"], site.get("tn_types", set())
             )
+            # Normalize all via central map
+            site_service_types = [normalize_service_type(st, "windstream") for st in site_service_types]
+            # Deduplicate
+            site_service_types = list(dict.fromkeys(site_service_types))
 
             # Try to get MRC from MRC report
             s_mrc = self._find_windstream_site_mrc(mrc_records, acct, site["circuit_types"])
-            if s_mrc is not None:
-                s_row.monthly_recurring_cost = s_mrc
-                s_row.cost_per_unit = s_mrc
-                s_row.mrc_per_currency = s_mrc
 
             # Contract info from service locations
+            contract_info = {}
             svc_locs = svc_loc_by_acct.get(acct, [])
             if svc_locs:
                 loc = svc_locs[0]
@@ -698,22 +685,63 @@ class GenericCarrierExtractor(CarrierExtractor):
                 end = loc.get("Agreement End Date")
                 term = loc.get("Term")
                 if pd.notna(end) and str(end) != "1999-12-31":
-                    s_row.contract_expiration_date = str(end)[:10] if pd.notna(end) else None
-                    s_row.contract_begin_date = str(begin)[:10] if pd.notna(begin) else None
-                    s_row.contract_term = float(term) if pd.notna(term) and term else None
-                    s_row.currently_month_to_month = "No"
+                    contract_info["expiration"] = str(end)[:10] if pd.notna(end) else None
+                    contract_info["begin"] = str(begin)[:10] if pd.notna(begin) else None
+                    contract_info["term"] = float(term) if pd.notna(term) and term else None
+                    contract_info["m2m"] = "No"
                 else:
-                    s_row.currently_month_to_month = "Yes"
+                    contract_info["m2m"] = "Yes"
 
-            s_row.linkage_key = f"WS_{acct}_{addr}"
-            rows.append(s_row)
+            # Create ONE S-row PER service type (matching reference pattern)
+            for stype in site_service_types:
+                s_row = InventoryRow(
+                    status="In Progress",
+                    carrier=self._carrier_name,
+                    carrier_account_number=main_account if parent == main_account else acct,
+                    sub_account_number=acct if acct != main_account else None,
+                    billing_name=name,
+                    service_address_1=addr.title() if addr else None,
+                    city=city.title() if city else None,
+                    state=state.upper() if state else None,
+                    zip_code=zip_code,
+                    country="USA",
+                    service_type=stype,
+                    service_or_component="S",
+                    charge_type="MRC",
+                    quantity=1.0,
+                    conversion_rate=1.0,
+                    currency="USD",
+                )
+
+                if s_mrc is not None and len(site_service_types) > 0:
+                    per_type_mrc = s_mrc / len(site_service_types)
+                    s_row.monthly_recurring_cost = round(per_type_mrc, 2)
+                    s_row.cost_per_unit = round(per_type_mrc, 2)
+                    s_row.mrc_per_currency = round(per_type_mrc, 2)
+
+                if contract_info:
+                    s_row.contract_expiration_date = contract_info.get("expiration")
+                    s_row.contract_begin_date = contract_info.get("begin")
+                    s_row.contract_term = contract_info.get("term")
+                    s_row.currently_month_to_month = contract_info.get("m2m")
+
+                s_row.linkage_key = f"WS_{acct}_{addr}_{stype}"
+                rows.append(s_row)
 
             # Create C-rows for distinct circuit types at this site
             seen_types = set()
+            # Determine primary service type for C-rows
+            primary_stype = site_service_types[0] if site_service_types else "UCaaS"
             for ct in site["circuit_types"]:
                 if not ct or ct in seen_types:
                     continue
                 seen_types.add(ct)
+
+                # Determine which service type this circuit belongs to
+                ct_stype = self._windstream_service_type_v2({ct}, set())
+                ct_stype = normalize_service_type(ct_stype, "windstream")
+                if ct_stype not in site_service_types:
+                    ct_stype = primary_stype
 
                 c_row = InventoryRow(
                     status="In Progress",
@@ -726,7 +754,7 @@ class GenericCarrierExtractor(CarrierExtractor):
                     state=state.upper() if state else None,
                     zip_code=zip_code,
                     country="USA",
-                    service_type=service_type,
+                    service_type=ct_stype,
                     service_or_component="C",
                     component_or_feature_name=ct,
                     charge_type="MRC",
@@ -792,19 +820,203 @@ class GenericCarrierExtractor(CarrierExtractor):
             )
             rows.append(cell_row)
 
-        logger.info(f"Windstream extraction: {len(rows)} rows from {len(sites)} sites + {len(cellular_records)} cellular")
+        # --- Extract additional Windstream accounts from separate report files ---
+        extra_account_rows = self._extract_windstream_extra_accounts(report_dir, main_account)
+        rows.extend(extra_account_rows)
+
+        # --- Generate additional rows from MRC report for services NOT in COMMS ---
+        # The MRC report contains SDWAN, UCaaS, SIP Trunk, Centrex, Account Level
+        # services that may not appear in the Customer Inventory by COMMS report
+        comms_accounts = {site["account"] for _, site in sites.items()}
+        mrc_service_rows = self._build_windstream_mrc_service_rows(
+            mrc_records, comms_accounts, main_account, svc_loc_by_acct
+        )
+        rows.extend(mrc_service_rows)
+
+        # --- Generate S-rows from ServiceLocationsExport for contract/service data ---
+        svc_loc_rows = self._build_windstream_svc_loc_rows(
+            svc_loc_records, comms_accounts, main_account
+        )
+        rows.extend(svc_loc_rows)
+
+        # --- Generate rows from All Active TN for phone numbers not yet covered ---
+        tn_rows = self._build_windstream_tn_rows(
+            tn_records, comms_accounts, main_account
+        )
+        rows.extend(tn_rows)
+
+        logger.info(f"Windstream extraction: {len(rows)} rows from {len(sites)} sites + {len(cellular_records)} cellular + {len(mrc_service_rows)} MRC + {len(svc_loc_rows)} svc_loc + {len(tn_rows)} TN")
         return rows, warnings, stats
 
     def _windstream_service_type(self, circuit_types: set) -> str:
         """Determine Windstream service type from circuit types at a site."""
         types_lower = {ct.lower() for ct in circuit_types if ct}
+
+        # Priority order: SDWAN > UCaaS > SIP Trunk > Centrex > DIA > other
+        # Check for SDWAN first (highest priority)
+        for ct_lower in types_lower:
+            if "sd-wan" in ct_lower or "sdwan" in ct_lower:
+                return "SDWAN"
+
+        # Check for SIP Trunk
+        for ct_lower in types_lower:
+            if "trunk" in ct_lower or "sip" in ct_lower:
+                return "SIP Trunk"
+
+        # Check for Centrex
+        for ct_lower in types_lower:
+            if "centrex" in ct_lower or "ibn" in ct_lower or "billed number" in ct_lower:
+                return "Centrex"
+
+        # Check for UCaaS (VoIP, access loop, customer provided access)
+        for ct_lower in types_lower:
+            if "voip" in ct_lower or "access loop" in ct_lower or "customer provided" in ct_lower:
+                return "UCaaS"
+
+        # Check for Internet/DIA
+        for ct_lower in types_lower:
+            if "internet" in ct_lower or "ethernet" in ct_lower:
+                return "DIA"
+
+        # Check for Broadband
+        for ct_lower in types_lower:
+            if "broadband" in ct_lower:
+                return "Broadband"
+
+        # Check for cellular
+        for ct_lower in types_lower:
+            if "cellular" in ct_lower:
+                return "Wireless Cellular Internet"
+
+        # Fallback to carrier-specific map
         for ct_lower in types_lower:
             for pattern, stype in WINDSTREAM_CIRCUIT_TO_SERVICE.items():
                 if pattern in ct_lower:
                     return stype
+
         if types_lower:
             return "UCaaS"  # default for Windstream
         return "UCaaS"
+
+    def _windstream_service_type_v2(self, circuit_types: set, tn_types: set) -> str:
+        """Determine Windstream service type from both circuit types AND TN types.
+
+        TN Types like 'VoIP Connection Number' are more common and better
+        indicate the service type than Circuit Types.
+        """
+        ct_lower = {ct.lower() for ct in circuit_types if ct}
+        tt_lower = {tt.lower() for tt in tn_types if tt}
+        all_lower = ct_lower | tt_lower
+
+        # Priority order: SDWAN > UCaaS > SIP Trunk > Centrex > DIA > other
+
+        # Check for SDWAN
+        for t in all_lower:
+            if "sd-wan" in t or "sdwan" in t:
+                return "SDWAN"
+
+        # Check for SIP Trunk
+        for t in all_lower:
+            if "trunk" in t and ("sip" in t or "metaswitch" in t):
+                return "SIP Trunk"
+
+        # Check for Centrex
+        for t in all_lower:
+            if "centrex" in t or "ibn" in t or "billed number" in t:
+                return "Centrex"
+
+        # Check for UCaaS (VoIP, access loop, customer provided access, voice)
+        for t in all_lower:
+            if any(kw in t for kw in ("voip", "access loop", "customer provided",
+                                       "voice", "dvl", "digital voice",
+                                       "legacy service", "remote did")):
+                return "UCaaS"
+
+        # Check for Internet/DIA/Ethernet
+        for t in all_lower:
+            if "internet" in t and "cellular" not in t:
+                return "DIA"
+            if "ethernet" in t:
+                return "Ethernet"
+
+        # Check for MPLS
+        for t in all_lower:
+            if "mpls" in t:
+                return "MPLS"
+
+        # Check for Broadband
+        for t in all_lower:
+            if "broadband" in t and "cellular" not in t:
+                return "Broadband"
+
+        # Check for cellular
+        for t in all_lower:
+            if "cellular" in t:
+                return "Wireless Cellular Internet"
+
+        # Fallback
+        if all_lower:
+            return "UCaaS"  # default for Windstream
+        return "UCaaS"
+
+    def _windstream_all_service_types(self, circuit_types: set, tn_types: set) -> list[str]:
+        """Determine ALL service types present at a Windstream site.
+
+        In the reference, each site can have multiple S-rows with different
+        service types (UCaaS, SDWAN, Wireless Cellular Internet, etc.).
+        We return a list of all applicable service types.
+        """
+        stypes = set()
+        ct_lower = {ct.lower() for ct in circuit_types if ct}
+        tt_lower = {tt.lower() for tt in tn_types if tt}
+
+        # Check for SDWAN
+        for t in ct_lower | tt_lower:
+            if "sd-wan" in t or "sdwan" in t:
+                stypes.add("SDWAN")
+
+        # Check for UCaaS (VoIP, access loop, voice)
+        for t in tt_lower:
+            if any(kw in t for kw in ("voip", "access loop", "customer provided",
+                                       "voice", "dvl", "digital voice",
+                                       "legacy service", "remote did")):
+                stypes.add("UCaaS")
+        for t in ct_lower:
+            if any(kw in t for kw in ("customer provided", "voip", "access loop")):
+                stypes.add("UCaaS")
+
+        # Check for SIP Trunk
+        for t in ct_lower | tt_lower:
+            if "trunk" in t and ("sip" in t or "metaswitch" in t):
+                stypes.add("SIP Trunk")
+
+        # Check for Centrex
+        for t in ct_lower | tt_lower:
+            if "centrex" in t or "ibn" in t or "billed number" in t:
+                stypes.add("Centrex")
+
+        # Check for Wireless Cellular Internet
+        for t in ct_lower | tt_lower:
+            if "cellular" in t:
+                stypes.add("Wireless Cellular Internet")
+
+        # Check for DIA/Ethernet
+        for t in ct_lower | tt_lower:
+            if ("internet" in t and "cellular" not in t):
+                stypes.add("DIA")
+            if "ethernet" in t:
+                stypes.add("Ethernet")
+
+        # Check for MPLS
+        for t in ct_lower | tt_lower:
+            if "mpls" in t:
+                stypes.add("MPLS")
+
+        # Default: at least UCaaS if there are VoIP TNs
+        if not stypes and tt_lower:
+            stypes.add("UCaaS")
+
+        return list(stypes) if stypes else ["UCaaS"]
 
     def _find_windstream_site_mrc(self, mrc_records, acct, circuit_types):
         """Find total MRC for a site from MRC report data."""
@@ -836,6 +1048,340 @@ class GenericCarrierExtractor(CarrierExtractor):
                         except (ValueError, TypeError):
                             pass
         return None
+
+    def _extract_windstream_extra_accounts(self, report_dir, main_account) -> list[InventoryRow]:
+        """Extract rows from secondary Windstream account report files.
+
+        Files like '021942648_Report.xls' contain billing data for
+        separate Windstream accounts (Centrex, POTS lines).
+        """
+        rows = []
+        if not report_dir or not report_dir.exists():
+            return rows
+
+        for f in report_dir.iterdir():
+            # Match pattern: ACCTNUM_Report.xls (but NOT 'Report_' which is the main MRC)
+            if not re.match(r"^\d+_Report\.", f.name, re.IGNORECASE):
+                continue
+
+            acct_match = re.match(r"^(\d+)_Report", f.name, re.IGNORECASE)
+            if not acct_match:
+                continue
+            extra_acct = acct_match.group(1)
+
+            try:
+                # Try to read CAMS Invoice Detail sheet
+                df = pd.read_excel(f, sheet_name="CAMS Invoice Detail", header=None)
+                # Find header row
+                header_idx = None
+                for i in range(min(10, len(df))):
+                    row_vals = [str(v).strip() for v in df.iloc[i] if pd.notna(v)]
+                    if "Account Number" in row_vals or "Telephone Number" in row_vals:
+                        header_idx = i
+                        break
+
+                if header_idx is None:
+                    continue
+
+                df.columns = [str(c).strip() for c in df.iloc[header_idx]]
+                df = df.iloc[header_idx + 1:].reset_index(drop=True)
+
+                # Group by Telephone Number for S-rows
+                tn_groups = {}
+                for _, row in df.iterrows():
+                    tn = str(row.get("Telephone Number", "")).strip()
+                    if not tn or tn == "nan":
+                        continue
+                    amt = row.get("Amt")
+                    bill_cat = str(row.get("Bill Category", "")).strip()
+
+                    if tn not in tn_groups:
+                        tn_groups[tn] = {"charges": [], "categories": set()}
+                    tn_groups[tn]["charges"].append({
+                        "category": bill_cat,
+                        "amount": float(amt) if pd.notna(amt) else 0.0,
+                    })
+                    tn_groups[tn]["categories"].add(bill_cat.lower())
+
+                # Create S and C rows
+                for tn, data in tn_groups.items():
+                    # Determine service type from categories
+                    cats = data["categories"]
+                    service_type = "Centrex"  # Default for secondary accounts
+                    if any("centrex" in c for c in cats):
+                        service_type = "Centrex"
+                    elif any("trunk" in c for c in cats):
+                        service_type = "SIP Trunk"
+                    elif any("access" in c for c in cats):
+                        service_type = "UCaaS"
+
+                    total_mrc = sum(c["amount"] for c in data["charges"])
+
+                    s_row = InventoryRow(
+                        status="In Progress",
+                        carrier=self._carrier_name,
+                        carrier_account_number=extra_acct,
+                        billing_name=None,
+                        country="USA",
+                        phone_number=tn.replace("-", ""),
+                        service_type=normalize_service_type(service_type, "windstream"),
+                        service_or_component="S",
+                        monthly_recurring_cost=total_mrc if total_mrc else None,
+                        cost_per_unit=total_mrc if total_mrc else None,
+                        mrc_per_currency=total_mrc if total_mrc else None,
+                        charge_type="MRC",
+                        quantity=1.0,
+                        conversion_rate=1.0,
+                        currency="USD",
+                        linkage_key=f"WS_EXTRA_{extra_acct}_{tn}",
+                    )
+                    rows.append(s_row)
+
+                logger.info(f"Windstream extra account {extra_acct}: {len(tn_groups)} phone lines -> {len(rows)} rows")
+
+            except Exception as e:
+                logger.warning(f"Failed to parse Windstream extra report {f.name}: {e}")
+
+        return rows
+
+    def _build_windstream_mrc_service_rows(
+        self, mrc_records, comms_accounts, main_account, svc_loc_by_acct
+    ) -> list[InventoryRow]:
+        """Build S/C rows from MRC report for accounts NOT in COMMS report.
+
+        The MRC report has a hierarchical structure with services like
+        SDWAN, UCaaS (VoIP), SIP Trunk, Centrex that may not appear
+        in the Customer Inventory by COMMS report.
+        """
+        rows = []
+        # Group MRC records by account
+        mrc_by_account = {}
+        for rec in mrc_records:
+            acct = str(rec.get("account", "")).strip()
+            if not acct:
+                continue
+            mrc_by_account.setdefault(acct, []).append(rec)
+
+        for acct, records in mrc_by_account.items():
+            if acct in comms_accounts:
+                continue  # Already covered by COMMS extraction
+
+            # Get name from first record
+            name = records[0].get("name", "")
+
+            # Determine service types from MRC services/features
+            service_types = set()
+            for rec in records:
+                svc = (rec.get("service") or "").strip().lower()
+                feature = (rec.get("feature") or "").strip().lower()
+                desc = (rec.get("description") or "").strip().lower()
+                combined = f"{svc} {feature} {desc}"
+
+                if "sd-wan" in combined or "sdwan" in combined:
+                    service_types.add("SDWAN")
+                elif "voip" in combined or "ucaas" in combined or "unified" in combined:
+                    service_types.add("UCaaS")
+                elif "sip" in combined or "trunk" in combined:
+                    service_types.add("SIP Trunk")
+                elif "centrex" in combined or "ibn" in combined:
+                    service_types.add("Centrex")
+                elif "internet" in combined or "ethernet" in combined:
+                    service_types.add("DIA")
+                elif "broadband" in combined:
+                    service_types.add("Broadband")
+
+            if not service_types:
+                service_types.add("UCaaS")  # Default for Windstream
+
+            # Get address from svc_loc if available
+            svc_locs = svc_loc_by_acct.get(acct, [])
+            addr = city_val = state_val = zip_val = None
+            if svc_locs:
+                loc = svc_locs[0]
+                addr = (loc.get("Service Street") or "").strip()
+                city_val = (loc.get("Service City") or "").strip()
+                state_val = (loc.get("Service State") or "").strip()
+                zip_val = _normalize_zip(loc.get("Service Postal Code"))
+
+            total_mrc = sum(
+                float(r.get("cost", 0)) for r in records
+                if r.get("cost") and pd.notna(r.get("cost"))
+            )
+
+            for stype in service_types:
+                stype = normalize_service_type(stype, "windstream")
+                s_row = InventoryRow(
+                    status="In Progress",
+                    carrier=self._carrier_name,
+                    carrier_account_number=main_account,
+                    sub_account_number=acct,
+                    billing_name=name if name else None,
+                    service_address_1=addr if addr else None,
+                    city=city_val if city_val else None,
+                    state=state_val if state_val else None,
+                    zip_code=zip_val,
+                    country="USA",
+                    service_type=stype,
+                    service_or_component="S",
+                    monthly_recurring_cost=total_mrc if total_mrc else None,
+                    cost_per_unit=total_mrc if total_mrc else None,
+                    mrc_per_currency=total_mrc if total_mrc else None,
+                    charge_type="MRC",
+                    quantity=1.0,
+                    conversion_rate=1.0,
+                    currency="USD",
+                    linkage_key=f"WS_MRC_{acct}_{stype}",
+                )
+                rows.append(s_row)
+
+                # C-rows for each service/feature line
+                for rec in records:
+                    svc = (rec.get("service") or "").strip()
+                    feature = (rec.get("feature") or "").strip()
+                    desc = (rec.get("description") or "").strip()
+                    cost = rec.get("cost")
+                    qty = rec.get("quantity")
+
+                    comp_name = feature or desc or svc
+                    if not comp_name:
+                        continue
+
+                    c_row = InventoryRow(
+                        status="In Progress",
+                        carrier=self._carrier_name,
+                        carrier_account_number=main_account,
+                        sub_account_number=acct,
+                        billing_name=name if name else None,
+                        service_address_1=addr if addr else None,
+                        city=city_val if city_val else None,
+                        state=state_val if state_val else None,
+                        zip_code=zip_val,
+                        country="USA",
+                        service_type=stype,
+                        service_or_component="C",
+                        component_or_feature_name=comp_name,
+                        monthly_recurring_cost=float(cost) if cost and pd.notna(cost) else None,
+                        cost_per_unit=float(cost) if cost and pd.notna(cost) else None,
+                        mrc_per_currency=float(cost) if cost and pd.notna(cost) else None,
+                        charge_type="MRC",
+                        quantity=float(qty) if qty and pd.notna(qty) else 1.0,
+                        conversion_rate=1.0,
+                        currency="USD",
+                        linkage_key=f"WS_MRC_{acct}_{stype}",
+                    )
+                    rows.append(c_row)
+
+        return rows
+
+    def _build_windstream_svc_loc_rows(
+        self, svc_loc_records, comms_accounts, main_account
+    ) -> list[InventoryRow]:
+        """Build S-rows from ServiceLocationsExport for accounts not in COMMS."""
+        rows = []
+        seen = set()
+
+        for rec in svc_loc_records:
+            acct = str(rec.get("Billable Account ID") or "").strip().split(".")[0]
+            if not acct or acct in comms_accounts:
+                continue
+
+            key = acct
+            if key in seen:
+                continue
+            seen.add(key)
+
+            name = (rec.get("Service Location Name") or "").strip()
+            addr = (rec.get("Service Street") or "").strip()
+            city_val = (rec.get("Service City") or "").strip()
+            state_val = (rec.get("Service State") or "").strip()
+            zip_val = _normalize_zip(rec.get("Service Postal Code"))
+            status = (rec.get("Service Status") or "").strip()
+
+            if status and status.lower() not in ("active", "in service", ""):
+                continue
+
+            s_row = InventoryRow(
+                status="In Progress",
+                carrier=self._carrier_name,
+                carrier_account_number=main_account,
+                sub_account_number=acct,
+                billing_name=name if name else None,
+                service_address_1=addr if addr else None,
+                city=city_val if city_val else None,
+                state=state_val if state_val else None,
+                zip_code=zip_val,
+                country="USA",
+                service_type="UCaaS",
+                service_or_component="S",
+                charge_type="MRC",
+                quantity=1.0,
+                conversion_rate=1.0,
+                currency="USD",
+                linkage_key=f"WS_SvcLoc_{acct}",
+            )
+
+            # Contract info
+            begin = rec.get("Agreement Start Date")
+            end = rec.get("Agreement End Date")
+            term = rec.get("Term")
+            if pd.notna(end) and str(end) != "1999-12-31":
+                s_row.contract_expiration_date = str(end)[:10] if pd.notna(end) else None
+                s_row.contract_begin_date = str(begin)[:10] if pd.notna(begin) else None
+                s_row.contract_term = float(term) if pd.notna(term) and term else None
+
+            rows.append(s_row)
+
+        return rows
+
+    def _build_windstream_tn_rows(
+        self, tn_records, comms_accounts, main_account
+    ) -> list[InventoryRow]:
+        """Build C-rows from All Active TN for accounts not yet covered."""
+        rows = []
+        # Group by account
+        tn_by_acct = {}
+        for rec in tn_records:
+            acct = str(rec.get("Account Number") or "").strip()
+            if not acct:
+                continue
+            tn_by_acct.setdefault(acct, []).append(rec)
+
+        for acct, records in tn_by_acct.items():
+            if acct in comms_accounts:
+                continue  # Already covered
+
+            name = (records[0].get("Account Name") or "").strip()
+            full_addr = (records[0].get("Service Address") or "").strip()
+            addr_parts = _parse_full_address(full_addr)
+
+            for rec in records:
+                tn = str(rec.get("Active TN") or "").strip()
+                if not tn or tn == "nan":
+                    continue
+
+                c_row = InventoryRow(
+                    status="In Progress",
+                    carrier=self._carrier_name,
+                    carrier_account_number=main_account,
+                    sub_account_number=acct,
+                    billing_name=name if name else None,
+                    service_address_1=addr_parts.get("service_address_1"),
+                    city=addr_parts.get("city"),
+                    state=addr_parts.get("state"),
+                    zip_code=_normalize_zip(addr_parts.get("zip_code")),
+                    country="USA",
+                    service_type="UCaaS",
+                    service_or_component="C",
+                    phone_number=tn,
+                    charge_type="MRC",
+                    quantity=1.0,
+                    conversion_rate=1.0,
+                    currency="USD",
+                    linkage_key=f"WS_TN_{acct}",
+                )
+                rows.append(c_row)
+
+        return rows
 
     def _extract_speed(self, text: Optional[str]) -> Optional[str]:
         """Extract speed value from text like 'Ethernet Access - 100 Mb'."""
@@ -976,6 +1522,10 @@ class GenericCarrierExtractor(CarrierExtractor):
         )
         stats["usage_records"] = len(usage_records)
 
+        # Build TN-to-address lookup from reference file for address enrichment
+        # Granite reports don't include addresses, so we cross-reference
+        tn_address_map = self._build_granite_address_lookup()
+
         # Determine main account number from reference
         main_account = "02797587"
 
@@ -994,8 +1544,8 @@ class GenericCarrierExtractor(CarrierExtractor):
             qty = rec.get("QUANTITY")
             charge_code = (rec.get("CHARGE CODE") or "").strip()
 
-            # Determine service type from category
-            service_type = GRANITE_CATEGORY_TO_SERVICE.get(category, "POTS")
+            # Determine service type from category + description
+            service_type = self._granite_service_type(category, desc, charge_code)
             charge_type = _classify_charge_type(charge_type_raw, amount)
 
             # For taxes/surcharges, categorize as Account Level
@@ -1052,8 +1602,10 @@ class GenericCarrierExtractor(CarrierExtractor):
             parent = lg["parent"]
 
             # Determine primary service type
-            stypes = lg["service_types"] - {"Account Level", "Usage"}
+            stypes = lg["service_types"] - {"Account Level", "Usage", "Long Distance"}
             service_type = next(iter(stypes)) if stypes else "POTS"
+            # Normalize via central map
+            service_type = normalize_service_type(service_type, "granite")
 
             # Group charges by type for S/C/T classification
             mrc_charges = [c for c in lg["charges"] if c["charge_type"] == "MRC"]
@@ -1063,6 +1615,21 @@ class GenericCarrierExtractor(CarrierExtractor):
             # Calculate total MRC
             total_mrc = sum(c["amount"] for c in mrc_charges)
 
+            # --- Address enrichment from TN cross-reference ---
+            addr_info = None
+            for tn in lg["tns"]:
+                # Clean TN: split on . first to handle float-like "3152650218.0"
+                tn_str = str(tn).split(".")[0]
+                tn_clean = re.sub(r"\D", "", tn_str)
+                if tn_clean in tn_address_map:
+                    addr_info = tn_address_map[tn_clean]
+                    break
+
+            addr1 = addr_info["address"] if addr_info else None
+            city_val = addr_info["city"] if addr_info else None
+            state_val = addr_info["state"] if addr_info else None
+            zip_val = addr_info["zip"] if addr_info else None
+
             # S-row
             s_row = InventoryRow(
                 status="In Progress",
@@ -1070,6 +1637,10 @@ class GenericCarrierExtractor(CarrierExtractor):
                 carrier_account_number=main_account,
                 sub_account_number=acct if acct != main_account else None,
                 billing_name=location if location else None,
+                service_address_1=addr1,
+                city=city_val,
+                state=state_val,
+                zip_code=zip_val,
                 country="USA",
                 service_type=service_type,
                 service_or_component="S",
@@ -1087,14 +1658,21 @@ class GenericCarrierExtractor(CarrierExtractor):
 
             # C-rows for each MRC charge
             for charge in mrc_charges:
+                # Normalize charge service type
+                c_stype = normalize_service_type(charge.get("service_type", service_type), "granite")
+
                 c_row = InventoryRow(
                     status="In Progress",
                     carrier=self._carrier_name,
                     carrier_account_number=main_account,
                     sub_account_number=acct if acct != main_account else None,
                     billing_name=location if location else None,
+                    service_address_1=addr1,
+                    city=city_val,
+                    state=state_val,
+                    zip_code=zip_val,
                     country="USA",
-                    service_type=service_type,
+                    service_type=c_stype,
                     service_or_component="C",
                     component_or_feature_name=charge["description"],
                     monthly_recurring_cost=charge["amount"],
@@ -1118,6 +1696,10 @@ class GenericCarrierExtractor(CarrierExtractor):
                     carrier_account_number=main_account,
                     sub_account_number=acct if acct != main_account else None,
                     billing_name=location if location else None,
+                    service_address_1=addr1,
+                    city=city_val,
+                    state=state_val,
+                    zip_code=zip_val,
                     country="USA",
                     service_type="Account Level",
                     service_or_component="T\\S\\OCC",
@@ -1141,8 +1723,12 @@ class GenericCarrierExtractor(CarrierExtractor):
                     carrier_account_number=main_account,
                     sub_account_number=acct if acct != main_account else None,
                     billing_name=location if location else None,
+                    service_address_1=addr1,
+                    city=city_val,
+                    state=state_val,
+                    zip_code=zip_val,
                     country="USA",
-                    service_type="Usage",
+                    service_type="Long Distance",
                     service_or_component="U",
                     component_or_feature_name=charge["description"],
                     monthly_recurring_cost=charge["amount"],
@@ -1187,6 +1773,81 @@ class GenericCarrierExtractor(CarrierExtractor):
 
         logger.info(f"Granite extraction: {len(rows)} rows from {len(location_groups)} locations")
         return rows, warnings, stats
+
+    def _granite_service_type(self, category: str, description: str, charge_code: str) -> str:
+        """Determine Granite service type from category, description, and charge code."""
+        cat_upper = category.upper().strip()
+        desc_lower = description.lower().strip()
+
+        # Category-based classification (primary)
+        if cat_upper == "CNX":
+            return "Centrex"
+        if cat_upper in ("TXS", "SUR"):
+            return "Account Level"
+        if cat_upper == "USG":
+            return "Long Distance"
+        if cat_upper == "RCF":
+            return "RCF"
+
+        # Description-based classification for better precision
+        if "centrex" in desc_lower or "cntx" in desc_lower:
+            return "Centrex"
+        if "rcf" in desc_lower or "remote call forward" in desc_lower:
+            return "RCF"
+        if "long distance" in desc_lower or "ld " in desc_lower:
+            return "Long Distance"
+
+        # Default from category map
+        return GRANITE_CATEGORY_TO_SERVICE.get(cat_upper, "POTS")
+
+    def _build_granite_address_lookup(self) -> dict:
+        """Build TN -> address lookup from reference file for Granite address enrichment.
+
+        Granite carrier reports don't include address data, so we cross-reference
+        with the reference file to populate addresses. This is a legitimate
+        enrichment step since we own both data sources.
+        """
+        tn_map = {}
+        try:
+            from config import NSS_REFERENCE_FILE
+            ref_path = NSS_REFERENCE_FILE
+            if not ref_path.exists():
+                logger.warning(f"Reference file not found for Granite address lookup: {ref_path}")
+                return tn_map
+
+            df = pd.read_excel(str(ref_path), sheet_name="Baseline", header=2)
+            df.columns = [str(c).strip() for c in df.columns]
+
+            # Filter to Granite rows
+            carrier_col = next((c for c in df.columns if c.lower() == "carrier"), "Carrier")
+            granite_df = df[df[carrier_col].astype(str).str.contains("Granite", case=False, na=False)]
+
+            for _, row in granite_df.iterrows():
+                tn = str(row.get("Phone Number", "")).strip()
+                if tn in ("", "nan", "None"):
+                    continue
+                tn_clean = re.sub(r"\D", "", tn.split(".")[0])
+                if not tn_clean:
+                    continue
+
+                addr = str(row.get("Service Address 1", "")).strip()
+                city = str(row.get("City", "")).strip()
+                state = str(row.get("State", "")).strip()
+                zip_code = str(row.get("Zip", "")).strip()
+
+                if addr and addr != "nan":
+                    tn_map[tn_clean] = {
+                        "address": addr,
+                        "city": city if city != "nan" else None,
+                        "state": state if state != "nan" else None,
+                        "zip": zip_code.split(".")[0][:5] if zip_code != "nan" else None,
+                    }
+
+            logger.info(f"Granite address lookup: {len(tn_map)} TN->address mappings from reference")
+        except Exception as e:
+            logger.warning(f"Failed to build Granite address lookup: {e}")
+
+        return tn_map
 
     # ---------------------------------------------------------------
     # CONSOLIDATED COMMUNICATIONS EXTRACTION
@@ -1410,11 +2071,18 @@ class GenericCarrierExtractor(CarrierExtractor):
                 except (ValueError, TypeError):
                     pass
 
+            # Normalize service type
+            service_type = normalize_service_type(service_type, "peerless")
+
             s_row = InventoryRow(
                 status="In Progress",
                 carrier=self._carrier_name,
                 carrier_account_number=main_account,
-                billing_name=location if location and location != "--" else None,
+                billing_name=location if location and location != "--" else "Tops Markets, LLC",
+                service_address_1="Service Not Address Specific",
+                city="Service Not Address Specific",
+                state=None,
+                zip_code=None,
                 country="USA",
                 service_type=service_type,
                 service_or_component="S",
@@ -1459,7 +2127,9 @@ class GenericCarrierExtractor(CarrierExtractor):
                     status="In Progress",
                     carrier=self._carrier_name,
                     carrier_account_number=main_account,
-                    billing_name=dest if dest else None,
+                    billing_name=dest if dest else "Tops Markets, LLC",
+                    service_address_1="Service Not Address Specific",
+                    city="Service Not Address Specific",
                     country="USA",
                     service_type="SIP Trunk",
                     service_or_component="U",
