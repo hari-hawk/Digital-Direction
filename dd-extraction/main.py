@@ -6,6 +6,8 @@ CLI entry point.
 Usage:
     python main.py --carrier charter --input-dir "path/to/inputs" --output-dir outputs/
     python main.py --carrier charter  # Uses default paths from config
+    python main.py --carrier all      # Extract ALL carriers
+    python main.py --carrier windstream granite peerless  # Extract specific carriers
 """
 import argparse
 import json
@@ -22,6 +24,7 @@ from config import (
     OUTPUT_DIR, CARRIER_REGISTRY, ANTHROPIC_API_KEY,
 )
 from src.extraction.charter import CharterExtractor
+from src.extraction.generic import GenericCarrierExtractor
 from src.classification.row_classifier import (
     validate_row_classification, ensure_parent_child_inheritance, get_row_stats,
 )
@@ -36,10 +39,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger("pipeline")
 
-# Carrier extractor registry
-EXTRACTORS = {
-    "charter": CharterExtractor,
-}
+
+def _get_extractor(carrier_key: str, carrier_info: dict):
+    """Get the appropriate extractor for a carrier."""
+    extractor_type = carrier_info.get("extractor", "generic")
+    if extractor_type == "charter":
+        return CharterExtractor()
+    else:
+        return GenericCarrierExtractor(
+            carrier_key=carrier_key,
+            carrier_name=carrier_info["display_name"],
+        )
 
 
 def run_pipeline(
@@ -55,9 +65,7 @@ def run_pipeline(
     if not carrier_info:
         raise ValueError(f"Unknown carrier: {carrier_key}. Available: {list(CARRIER_REGISTRY.keys())}")
 
-    extractor_cls = EXTRACTORS.get(carrier_key)
-    if not extractor_cls:
-        raise ValueError(f"No extractor implemented for: {carrier_key}")
+    extractor = _get_extractor(carrier_key, carrier_info)
 
     logger.info(f"=" * 60)
     logger.info(f"Starting extraction pipeline for: {carrier_info['display_name']}")
@@ -67,17 +75,23 @@ def run_pipeline(
     logger.info(f"=" * 60)
 
     # Resolve input directories
-    invoice_dir = input_dir / "Invoices" / carrier_info["invoice_folder"]
-    report_dir = input_dir / "Carrier Reports, Portal Data, ETC" / carrier_info["report_folder"]
-    contract_dir = input_dir / "Contracts" / carrier_info["contract_folder"]
+    invoice_folder = carrier_info.get("invoice_folder", "")
+    report_folder = carrier_info.get("report_folder", "")
+    contract_folder = carrier_info.get("contract_folder", "")
 
-    logger.info(f"Invoice dir: {invoice_dir} (exists: {invoice_dir.exists()})")
-    logger.info(f"Report dir: {report_dir} (exists: {report_dir.exists()})")
-    logger.info(f"Contract dir: {contract_dir} (exists: {contract_dir.exists()})")
+    invoice_dir = input_dir / "Invoices" / invoice_folder if invoice_folder else None
+    report_dir = input_dir / "Carrier Reports, Portal Data, ETC" / report_folder if report_folder else None
+    contract_dir = input_dir / "Contracts" / contract_folder if contract_folder else None
+
+    if invoice_dir:
+        logger.info(f"Invoice dir: {invoice_dir} (exists: {invoice_dir.exists()})")
+    if report_dir:
+        logger.info(f"Report dir: {report_dir} (exists: {report_dir.exists()})")
+    if contract_dir:
+        logger.info(f"Contract dir: {contract_dir} (exists: {contract_dir.exists()})")
 
     # --- Stage 1: Extraction ---
     logger.info("\n--- Stage 1: Extraction ---")
-    extractor = extractor_cls()
     result = extractor.extract(
         invoice_dir=invoice_dir,
         report_dir=report_dir,
@@ -138,6 +152,7 @@ def run_pipeline(
     elapsed = time.time() - start_time
     summary = {
         "carrier": carrier_info["display_name"],
+        "carrier_key": carrier_key,
         "total_rows": len(result.rows),
         "row_stats": row_stats,
         "qa_passed": qa_report.all_passed,
@@ -161,6 +176,130 @@ def run_pipeline(
     return summary
 
 
+def run_all_carriers(
+    input_dir: Path,
+    output_dir: Path,
+    api_key: str = "",
+    carriers: list[str] = None,
+) -> dict:
+    """Run extraction for multiple carriers and produce a combined output."""
+    start_time = time.time()
+    all_summaries = []
+    all_rows = []
+    total_warnings = 0
+    total_errors = 0
+
+    if carriers is None:
+        carriers = list(CARRIER_REGISTRY.keys())
+
+    logger.info(f"{'=' * 60}")
+    logger.info(f"MULTI-CARRIER EXTRACTION: {len(carriers)} carriers")
+    logger.info(f"Carriers: {', '.join(carriers)}")
+    logger.info(f"{'=' * 60}")
+
+    for carrier_key in carriers:
+        carrier_info = CARRIER_REGISTRY.get(carrier_key)
+        if not carrier_info:
+            logger.warning(f"Unknown carrier key: {carrier_key}, skipping")
+            continue
+
+        try:
+            logger.info(f"\n{'=' * 40}")
+            logger.info(f"Processing: {carrier_info['display_name']}")
+            logger.info(f"{'=' * 40}")
+
+            # Run extraction (single pass, collect rows for combined output)
+            extractor = _get_extractor(carrier_key, carrier_info)
+            invoice_folder = carrier_info.get("invoice_folder", "")
+            report_folder = carrier_info.get("report_folder", "")
+            contract_folder = carrier_info.get("contract_folder", "")
+
+            invoice_dir_path = input_dir / "Invoices" / invoice_folder if invoice_folder else None
+            report_dir_path = input_dir / "Carrier Reports, Portal Data, ETC" / report_folder if report_folder else None
+            contract_dir_path = input_dir / "Contracts" / contract_folder if contract_folder else None
+
+            carrier_start = time.time()
+            result = extractor.extract(
+                invoice_dir=invoice_dir_path,
+                report_dir=report_dir_path,
+                contract_dir=contract_dir_path,
+                api_key=api_key,
+            )
+
+            # Post-process rows
+            result.rows = ensure_parent_child_inheritance(result.rows)
+            for row in result.rows:
+                row.confidence = score_row_confidence(row)
+            row_stats = get_row_stats(result.rows)
+
+            # Write individual carrier output
+            output_dir_path = Path(output_dir)
+            output_file = output_dir_path / f"{carrier_key}_inventory_output.xlsx"
+            if result.rows:
+                generate_inventory_excel(result.rows, output_file, carrier_info["display_name"])
+
+            carrier_elapsed = time.time() - carrier_start
+
+            summary = {
+                "carrier": carrier_info["display_name"],
+                "carrier_key": carrier_key,
+                "total_rows": len(result.rows),
+                "row_stats": row_stats,
+                "processing_time_seconds": round(carrier_elapsed, 2),
+                "output_file": str(output_file),
+                "warnings_count": len(result.warnings),
+                "errors_count": len(result.errors),
+            }
+            all_summaries.append(summary)
+            total_warnings += len(result.warnings)
+            total_errors += len(result.errors)
+            all_rows.extend(result.rows)
+
+            logger.info(f"  {carrier_info['display_name']}: {len(result.rows)} rows in {carrier_elapsed:.1f}s")
+
+        except Exception as e:
+            logger.error(f"Failed to extract {carrier_info['display_name']}: {e}")
+            all_summaries.append({
+                "carrier": carrier_info["display_name"],
+                "carrier_key": carrier_key,
+                "total_rows": 0,
+                "error": str(e),
+            })
+
+    # Generate combined output
+    output_dir = Path(output_dir)
+    if all_rows:
+        combined_file = output_dir / "all_carriers_inventory_output.xlsx"
+        generate_inventory_excel(all_rows, combined_file, "All Carriers")
+        logger.info(f"\nCombined output: {combined_file} ({len(all_rows)} total rows)")
+
+    elapsed = time.time() - start_time
+
+    # Print summary table
+    logger.info(f"\n{'=' * 70}")
+    logger.info(f"MULTI-CARRIER EXTRACTION COMPLETE")
+    logger.info(f"{'=' * 70}")
+    logger.info(f"{'Carrier':<35} {'Rows':>8} {'Time':>8}")
+    logger.info(f"{'-' * 35} {'-' * 8} {'-' * 8}")
+    for s in all_summaries:
+        rows = s.get("total_rows", 0)
+        t = s.get("processing_time_seconds", 0)
+        logger.info(f"{s['carrier']:<35} {rows:>8} {t:>7.1f}s")
+    total_rows = sum(s.get("total_rows", 0) for s in all_summaries)
+    logger.info(f"{'-' * 35} {'-' * 8} {'-' * 8}")
+    logger.info(f"{'TOTAL':<35} {total_rows:>8} {elapsed:>7.1f}s")
+    logger.info(f"{'=' * 70}")
+
+    return {
+        "total_carriers": len(carriers),
+        "total_rows": total_rows,
+        "processing_time_seconds": round(elapsed, 2),
+        "carrier_summaries": all_summaries,
+        "total_warnings": total_warnings,
+        "total_errors": total_errors,
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Digital Direction Inventory Extraction Pipeline",
@@ -168,8 +307,8 @@ def main():
     parser.add_argument(
         "--carrier",
         required=True,
-        choices=list(CARRIER_REGISTRY.keys()),
-        help="Carrier to extract (e.g., charter)",
+        nargs="+",
+        help="Carrier(s) to extract. Use 'all' for all carriers, or list specific ones.",
     )
     parser.add_argument(
         "--input-dir",
@@ -193,25 +332,59 @@ def main():
         action="store_true",
         help="Enable verbose logging",
     )
+    parser.add_argument(
+        "--tier",
+        type=int,
+        choices=[1, 2, 3],
+        help="Only extract carriers at this tier level or higher priority (lower number)",
+    )
 
     args = parser.parse_args()
 
     if args.verbose:
         logging.getLogger().setLevel(logging.DEBUG)
 
-    summary = run_pipeline(
-        carrier_key=args.carrier,
-        input_dir=args.input_dir,
-        output_dir=args.output_dir,
-        api_key=args.anthropic_api_key,
-    )
+    # Determine which carriers to run
+    carriers = args.carrier
+    if "all" in carriers:
+        if args.tier:
+            carriers = [k for k, v in CARRIER_REGISTRY.items() if v.get("tier", 99) <= args.tier]
+        else:
+            carriers = list(CARRIER_REGISTRY.keys())
+    else:
+        # Validate carrier names
+        for c in carriers:
+            if c not in CARRIER_REGISTRY:
+                available = ", ".join(sorted(CARRIER_REGISTRY.keys()))
+                parser.error(f"Unknown carrier: {c}. Available: {available}")
 
-    # Write summary JSON
-    summary_file = Path(args.output_dir) / f"{args.carrier}_pipeline_summary.json"
-    summary_file.parent.mkdir(parents=True, exist_ok=True)
-    with open(summary_file, "w") as f:
-        json.dump(summary, f, indent=2, default=str)
-    logger.info(f"Summary written to: {summary_file}")
+    # Run extraction
+    if len(carriers) == 1:
+        summary = run_pipeline(
+            carrier_key=carriers[0],
+            input_dir=args.input_dir,
+            output_dir=args.output_dir,
+            api_key=args.anthropic_api_key,
+        )
+        # Write summary JSON
+        summary_file = Path(args.output_dir) / f"{carriers[0]}_pipeline_summary.json"
+        summary_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(summary_file, "w") as f:
+            json.dump(summary, f, indent=2, default=str)
+        logger.info(f"Summary written to: {summary_file}")
+    else:
+        summary = run_all_carriers(
+            input_dir=args.input_dir,
+            output_dir=args.output_dir,
+            api_key=args.anthropic_api_key,
+            carriers=carriers,
+        )
+        # Write combined summary JSON
+        summary_file = Path(args.output_dir) / "all_carriers_pipeline_summary.json"
+        summary_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(summary_file, "w") as f:
+            json.dump(summary, f, indent=2, default=str)
+        logger.info(f"Summary written to: {summary_file}")
 
 
 if __name__ == "__main__":
