@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -18,7 +18,7 @@ interface UploadResult {
 }
 
 export default function UploadPage() {
-  const { projectId, ready } = useProjectIdWithReady();
+  const { projectId } = useProjectIdWithReady();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
 
@@ -34,7 +34,7 @@ export default function UploadPage() {
   // Timeline state
   const [currentFileIndex, setCurrentFileIndex] = useState(0);
   const [currentFileName, setCurrentFileName] = useState("");
-  const [startTime, setStartTime] = useState(0);
+  const [, setStartTime] = useState(0);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [estimatedTotalMs, setEstimatedTotalMs] = useState(0);
 
@@ -246,7 +246,7 @@ export default function UploadPage() {
               type="file"
               // @ts-expect-error - webkitdirectory is valid but not in types
               webkitdirectory=""
-              // @ts-expect-error
+              // @ts-expect-error directory is a valid HTML attribute but not in React types
               directory=""
               multiple
               className="hidden"

@@ -11,14 +11,12 @@ const STORAGE_KEY = "dd_active_project";
  */
 export function useProjectId(): string {
   const [projectId, setProjectId] = useState(DEFAULT_PROJECT);
-  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
       setProjectId(stored);
     }
-    setReady(true);
   }, []);
 
   // Return default during SSR, actual value after mount

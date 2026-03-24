@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -531,7 +531,8 @@ export default function InventoryPage() {
       });
     }).catch(() => {});
     api.getConfidenceSummary(projectId, source).then(setConfidence).catch(() => {});
-  }, [projectId, source]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, source, activeSheet, ready]);
 
   // Load table data
   const loadData = useCallback(async () => {

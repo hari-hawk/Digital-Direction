@@ -1,6 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
-import { Card, CardContent } from "@/components/ui/card";
+import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { api, CarrierSummary, CarrierDocs } from "@/lib/api";
@@ -13,13 +12,6 @@ const DOC_TYPE_COLORS: Record<string, string> = {
   contract: "bg-purple-500/20 text-purple-300 border-purple-500/30",
   carrier_report: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
   csr: "bg-amber-500/20 text-amber-300 border-amber-500/30",
-};
-
-const DOC_TYPE_LABELS: Record<string, string> = {
-  invoice: "Invoice",
-  contract: "Contract",
-  carrier_report: "Report",
-  csr: "CSR",
 };
 
 const FORMAT_ICONS: Record<string, string> = {

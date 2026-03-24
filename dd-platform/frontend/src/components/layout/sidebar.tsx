@@ -3,8 +3,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { api } from "@/lib/api";
-import NotificationBell from "@/components/layout/notifications";
-
 const navItems = [
   { href: "/", label: "Dashboard", icon: "\u{1F4CA}" },
   { href: "/upload", label: "Upload", icon: "\u{1F4E4}" },

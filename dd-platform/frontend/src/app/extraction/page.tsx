@@ -13,7 +13,7 @@ export default function ExtractionPage() {
   const [selectedCarrier, setSelectedCarrier] = useState("charter");
   const [apiKey, setApiKey] = useState("");
   const [running, setRunning] = useState(false);
-  const [taskId, setTaskId] = useState<string | null>(null);
+  const [, setTaskId] = useState<string | null>(null);
   const [progress, setProgress] = useState(0);
   const [currentCarrier, setCurrentCarrier] = useState("");
   const [elapsedSeconds, setElapsedSeconds] = useState(0);

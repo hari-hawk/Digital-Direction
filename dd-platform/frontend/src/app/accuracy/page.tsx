@@ -53,7 +53,7 @@ export default function AccuracyPage() {
       if (result.error) {
         setError(result.error);
       }
-    } catch (e) {
+    } catch {
       setError("Failed to load accuracy data");
     }
     setLoading(false);
