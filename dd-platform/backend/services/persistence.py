@@ -40,6 +40,8 @@ def load_projects() -> dict[str, dict]:
     """Load all projects from database."""
     try:
         conn = _get_conn()
+        if conn is None:
+            return {}
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         cur.execute("SELECT id, name, input_dir, output_dir, reference_file, extraction_dir FROM projects ORDER BY created_at")
         rows = cur.fetchall()
@@ -55,6 +57,8 @@ def save_project(project: dict) -> None:
     """Upsert a project."""
     try:
         conn = _get_conn()
+        if conn is None:
+            return
         cur = conn.cursor()
         cur.execute("""
             INSERT INTO projects (id, name, input_dir, output_dir, reference_file, extraction_dir)
