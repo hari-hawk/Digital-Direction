@@ -293,6 +293,9 @@ export const api = {
   // Projects
   getProjects: () => fetchApi<{ id: string; name: string }[]>("/projects"),
   createProject: (id: string, name: string) => postApi<{ id: string; name: string }>("/projects", { id, name }),
+  getProjectInfo: (projectId: string) => fetchApi<{
+    id: string; name: string; has_reference: boolean; has_extracted: boolean; default_source: string;
+  }>(`/projects/${projectId}/info`),
 
   // Upload - single file
   uploadFile: async (projectId: string, file: File, carrier: string, docType: string) => {

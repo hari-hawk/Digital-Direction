@@ -76,6 +76,32 @@ async def list_projects():
     return list(app.state.projects.values())
 
 
+@app.get("/api/projects/{project_id}/info")
+async def project_info(project_id: str):
+    """Return project metadata including data availability flags."""
+    proj = app.state.projects.get(project_id)
+    if not proj:
+        return {"error": "Project not found"}
+
+    ref_file = proj.get("reference_file", "") or ""
+    has_reference = bool(ref_file) and Path(ref_file).exists() and Path(ref_file).is_file()
+
+    out_dir = proj.get("output_dir", "")
+    has_extracted = False
+    if out_dir:
+        output_dir = Path(out_dir)
+        if output_dir.exists():
+            has_extracted = bool(list(output_dir.glob("*_inventory_output.xlsx")))
+
+    return {
+        "id": proj.get("id", project_id),
+        "name": proj.get("name", project_id),
+        "has_reference": has_reference,
+        "has_extracted": has_extracted,
+        "default_source": "reference" if has_reference else ("extracted" if has_extracted else "none"),
+    }
+
+
 @app.post("/api/projects")
 async def create_project(data: dict):
     """Create a new project with its own input/output directories. Persisted to disk."""

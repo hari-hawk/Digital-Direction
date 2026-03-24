@@ -335,12 +335,38 @@ export default function InventoryPage() {
   const [confidenceExpanded, setConfidenceExpanded] = useState(true);
   const [reviewFilter, setReviewFilter] = useState<string>("");
 
+  // Project info — determines what data is available
+  const [projectInfo, setProjectInfo] = useState<{
+    has_reference: boolean; has_extracted: boolean; default_source: string;
+  } | null>(null);
+
   // Slider panel state
   const [selectedRowIndex, setSelectedRowIndex] = useState<number | null>(null);
 
   // Debounced search
   const [searchInput, setSearchInput] = useState("");
   const debouncedSearch = useDebounce(searchInput, 300);
+
+  // Load project info on mount — determines if reference/extracted tabs are available
+  useEffect(() => {
+    api.getProjectInfo(projectId).then((info) => {
+      setProjectInfo(info);
+      // Auto-set source based on what's available
+      if (!info.has_reference && info.has_extracted) {
+        setSource("extracted");
+      } else if (info.has_reference) {
+        setSource("reference");
+      } else if (!info.has_reference && !info.has_extracted) {
+        setSource("extracted"); // Will show empty state
+      }
+    }).catch(() => {
+      // Default: assume only extracted for non-NSS projects
+      if (projectId !== "nss") {
+        setSource("extracted");
+        setProjectInfo({ has_reference: false, has_extracted: false, default_source: "none" });
+      }
+    });
+  }, [projectId]);
 
   // Sync debounced search into filters
   useEffect(() => {
@@ -523,18 +549,20 @@ export default function InventoryPage() {
           </p>
         </div>
         <div className="flex gap-2 items-center">
-          {/* Toggle Switch: Reference <-> Extracted */}
+          {/* Toggle Switch: Reference <-> Extracted — only show Reference for projects that have it */}
           <div className="flex items-center bg-zinc-800 rounded-lg border border-zinc-700 p-0.5">
-            <button
-              onClick={() => switchSource("reference")}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-                source === "reference"
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : "text-zinc-400 hover:text-zinc-200"
-              }`}
-            >
-              Reference
-            </button>
+            {projectInfo?.has_reference && (
+              <button
+                onClick={() => switchSource("reference")}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  source === "reference"
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                Reference
+              </button>
+            )}
             <button
               onClick={() => switchSource("extracted")}
               className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
@@ -891,11 +919,24 @@ export default function InventoryPage() {
                 <div className="p-8 text-center text-zinc-400">Loading data...</div>
               ) : rows.length === 0 ? (
                 <div className="p-12 text-center">
-                  <p className="text-zinc-500 text-lg mb-2">No records found</p>
-                  {hasActiveFilters && (
-                    <button onClick={clearFilters} className="text-sm text-blue-400 hover:text-blue-300">
-                      Clear filters
-                    </button>
+                  {projectInfo && !projectInfo.has_reference && !projectInfo.has_extracted ? (
+                    <>
+                      <p className="text-3xl mb-3">📂</p>
+                      <p className="text-zinc-400 text-lg mb-2">No inventory data yet</p>
+                      <p className="text-zinc-500 text-sm mb-4">Upload documents and run extraction to populate inventory.</p>
+                      <a href="/upload" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium inline-block">
+                        Upload Documents
+                      </a>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-zinc-500 text-lg mb-2">No records found</p>
+                      {hasActiveFilters && (
+                        <button onClick={clearFilters} className="text-sm text-blue-400 hover:text-blue-300">
+                          Clear filters
+                        </button>
+                      )}
+                    </>
                   )}
                 </div>
               ) : (
