@@ -1,0 +1,74 @@
+{
+  "carrier": "Windstream",
+  "carrier_key": "windstream",
+  "total_rows": 713,
+  "row_stats": {
+    "total": 713,
+    "S": 155,
+    "C": 558,
+    "U": 0,
+    "T\\S\\OCC": 0,
+    "unclassified": 0
+  },
+  "qa_passed": false,
+  "qa_summary": {
+    "total_rules": 10,
+    "passed": 6,
+    "failed": 4,
+    "rules": {
+      "S-row MRC = sum(C-row MRCs)": {
+        "passed": false,
+        "violations": 148
+      },
+      "Required columns populated": {
+        "passed": false,
+        "violations": 299
+      },
+      "Service Type in dropdown": {
+        "passed": false,
+        "violations": 653
+      },
+      "Charge Type in dropdown": {
+        "passed": true,
+        "violations": 0
+      },
+      "S/C/U code valid": {
+        "passed": true,
+        "violations": 0
+      },
+      "No duplicate Circuit IDs": {
+        "passed": true,
+        "violations": 0
+      },
+      "No orphan C-rows": {
+        "passed": false,
+        "violations": 131
+      },
+      "Billing Name not blank": {
+        "passed": true,
+        "violations": 0
+      },
+      "Currency = USD": {
+        "passed": true,
+        "violations": 0
+      },
+      "Phone number format": {
+        "passed": true,
+        "violations": 0
+      }
+    }
+  },
+  "confidence": {
+    "total_populated_fields": 13824,
+    "high": 7389,
+    "medium": 6435,
+    "low": 0,
+    "high_pct": 53.5,
+    "medium_pct": 46.5,
+    "low_pct": 0.0
+  },
+  "processing_time_seconds": 3.92,
+  "output_file": "outputs/windstream_inventory_output.xlsx",
+  "warnings_count": 0,
+  "errors_count": 0
+}

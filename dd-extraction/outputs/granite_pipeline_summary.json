@@ -1,0 +1,74 @@
+{
+  "carrier": "Granite",
+  "carrier_key": "granite",
+  "total_rows": 2073,
+  "row_stats": {
+    "total": 2073,
+    "S": 113,
+    "C": 1900,
+    "U": 60,
+    "T\\S\\OCC": 0,
+    "unclassified": 0
+  },
+  "qa_passed": false,
+  "qa_summary": {
+    "total_rules": 10,
+    "passed": 8,
+    "failed": 2,
+    "rules": {
+      "S-row MRC = sum(C-row MRCs)": {
+        "passed": true,
+        "violations": 0
+      },
+      "Required columns populated": {
+        "passed": false,
+        "violations": 2073
+      },
+      "Service Type in dropdown": {
+        "passed": false,
+        "violations": 60
+      },
+      "Charge Type in dropdown": {
+        "passed": true,
+        "violations": 0
+      },
+      "S/C/U code valid": {
+        "passed": true,
+        "violations": 0
+      },
+      "No duplicate Circuit IDs": {
+        "passed": true,
+        "violations": 0
+      },
+      "No orphan C-rows": {
+        "passed": true,
+        "violations": 0
+      },
+      "Billing Name not blank": {
+        "passed": true,
+        "violations": 0
+      },
+      "Currency = USD": {
+        "passed": true,
+        "violations": 0
+      },
+      "Phone number format": {
+        "passed": true,
+        "violations": 0
+      }
+    }
+  },
+  "confidence": {
+    "total_populated_fields": 37020,
+    "high": 14506,
+    "medium": 22514,
+    "low": 0,
+    "high_pct": 39.2,
+    "medium_pct": 60.8,
+    "low_pct": 0.0
+  },
+  "processing_time_seconds": 3.54,
+  "output_file": "/Users/harivershan/Library/CloudStorage/GoogleDrive-hari.sr@techjays.com/My Drive/Digital Direction POC/Claude/Code Agent/dd-extraction/outputs/granite_inventory_output.xlsx",
+  "warnings_count": 0,
+  "errors_count": 0
+}

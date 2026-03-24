@@ -22,3 +22,4 @@ dd-extraction/outputs/*.xlsx
 # Secrets
 .env
 *.env.local
+dd-extraction/.env

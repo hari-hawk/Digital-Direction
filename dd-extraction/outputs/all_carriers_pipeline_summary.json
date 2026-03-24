@@ -1,0 +1,400 @@
+{
+  "total_carriers": 23,
+  "total_rows": 6542,
+  "processing_time_seconds": 476.44,
+  "carrier_summaries": [
+    {
+      "carrier": "Charter Communications",
+      "carrier_key": "charter",
+      "total_rows": 1373,
+      "row_stats": {
+        "total": 1373,
+        "S": 156,
+        "C": 1163,
+        "U": 0,
+        "T\\S\\OCC": 54,
+        "unclassified": 0
+      },
+      "processing_time_seconds": 461.07,
+      "output_file": "outputs/charter_inventory_output.xlsx",
+      "warnings_count": 1,
+      "errors_count": 0
+    },
+    {
+      "carrier": "Windstream",
+      "carrier_key": "windstream",
+      "total_rows": 713,
+      "row_stats": {
+        "total": 713,
+        "S": 155,
+        "C": 558,
+        "U": 0,
+        "T\\S\\OCC": 0,
+        "unclassified": 0
+      },
+      "processing_time_seconds": 3.38,
+      "output_file": "outputs/windstream_inventory_output.xlsx",
+      "warnings_count": 0,
+      "errors_count": 0
+    },
+    {
+      "carrier": "Granite",
+      "carrier_key": "granite",
+      "total_rows": 2073,
+      "row_stats": {
+        "total": 2073,
+        "S": 113,
+        "C": 1900,
+        "U": 60,
+        "T\\S\\OCC": 0,
+        "unclassified": 0
+      },
+      "processing_time_seconds": 2.11,
+      "output_file": "outputs/granite_inventory_output.xlsx",
+      "warnings_count": 0,
+      "errors_count": 0
+    },
+    {
+      "carrier": "Peerless Network",
+      "carrier_key": "peerless",
+      "total_rows": 1766,
+      "row_stats": {
+        "total": 1766,
+        "S": 172,
+        "C": 0,
+        "U": 1594,
+        "T\\S\\OCC": 0,
+        "unclassified": 0
+      },
+      "processing_time_seconds": 1.54,
+      "output_file": "outputs/peerless_inventory_output.xlsx",
+      "warnings_count": 0,
+      "errors_count": 0
+    },
+    {
+      "carrier": "Consolidated Communications",
+      "carrier_key": "consolidated",
+      "total_rows": 111,
+      "row_stats": {
+        "total": 111,
+        "S": 83,
+        "C": 28,
+        "U": 0,
+        "T\\S\\OCC": 0,
+        "unclassified": 0
+      },
+      "processing_time_seconds": 0.19,
+      "output_file": "outputs/consolidated_inventory_output.xlsx",
+      "warnings_count": 0,
+      "errors_count": 0
+    },
+    {
+      "carrier": "Spectrotel",
+      "carrier_key": "spectrotel",
+      "total_rows": 20,
+      "row_stats": {
+        "total": 20,
+        "S": 10,
+        "C": 0,
+        "U": 10,
+        "T\\S\\OCC": 0,
+        "unclassified": 0
+      },
+      "processing_time_seconds": 0.04,
+      "output_file": "outputs/spectrotel_inventory_output.xlsx",
+      "warnings_count": 0,
+      "errors_count": 0
+    },
+    {
+      "carrier": "Frontier",
+      "carrier_key": "frontier",
+      "total_rows": 0,
+      "row_stats": {
+        "total": 0,
+        "S": 0,
+        "C": 0,
+        "U": 0,
+        "T\\S\\OCC": 0,
+        "unclassified": 0
+      },
+      "processing_time_seconds": 0.0,
+      "output_file": "outputs/frontier_inventory_output.xlsx",
+      "warnings_count": 1,
+      "errors_count": 0
+    },
+    {
+      "carrier": "Verizon",
+      "carrier_key": "verizon",
+      "total_rows": 0,
+      "row_stats": {
+        "total": 0,
+        "S": 0,
+        "C": 0,
+        "U": 0,
+        "T\\S\\OCC": 0,
+        "unclassified": 0
+      },
+      "processing_time_seconds": 0.0,
+      "output_file": "outputs/verizon_inventory_output.xlsx",
+      "warnings_count": 1,
+      "errors_count": 0
+    },
+    {
+      "carrier": "Delhi Telephone",
+      "carrier_key": "delhi_telephone",
+      "total_rows": 0,
+      "row_stats": {
+        "total": 0,
+        "S": 0,
+        "C": 0,
+        "U": 0,
+        "T\\S\\OCC": 0,
+        "unclassified": 0
+      },
+      "processing_time_seconds": 0.0,
+      "output_file": "outputs/delhi_telephone_inventory_output.xlsx",
+      "warnings_count": 1,
+      "errors_count": 0
+    },
+    {
+      "carrier": "Champlain Technology",
+      "carrier_key": "champlain",
+      "total_rows": 0,
+      "row_stats": {
+        "total": 0,
+        "S": 0,
+        "C": 0,
+        "U": 0,
+        "T\\S\\OCC": 0,
+        "unclassified": 0
+      },
+      "processing_time_seconds": 0.0,
+      "output_file": "outputs/champlain_inventory_output.xlsx",
+      "warnings_count": 1,
+      "errors_count": 0
+    },
+    {
+      "carrier": "Nextiva",
+      "carrier_key": "nextiva",
+      "total_rows": 485,
+      "row_stats": {
+        "total": 485,
+        "S": 11,
+        "C": 474,
+        "U": 0,
+        "T\\S\\OCC": 0,
+        "unclassified": 0
+      },
+      "processing_time_seconds": 0.79,
+      "output_file": "outputs/nextiva_inventory_output.xlsx",
+      "warnings_count": 0,
+      "errors_count": 0
+    },
+    {
+      "carrier": "WVT Fiber",
+      "carrier_key": "wvt_fiber",
+      "total_rows": 0,
+      "row_stats": {
+        "total": 0,
+        "S": 0,
+        "C": 0,
+        "U": 0,
+        "T\\S\\OCC": 0,
+        "unclassified": 0
+      },
+      "processing_time_seconds": 0.0,
+      "output_file": "outputs/wvt_fiber_inventory_output.xlsx",
+      "warnings_count": 1,
+      "errors_count": 0
+    },
+    {
+      "carrier": "TDS Telecom",
+      "carrier_key": "tds_telecom",
+      "total_rows": 0,
+      "row_stats": {
+        "total": 0,
+        "S": 0,
+        "C": 0,
+        "U": 0,
+        "T\\S\\OCC": 0,
+        "unclassified": 0
+      },
+      "processing_time_seconds": 0.0,
+      "output_file": "outputs/tds_telecom_inventory_output.xlsx",
+      "warnings_count": 1,
+      "errors_count": 0
+    },
+    {
+      "carrier": "StateTel",
+      "carrier_key": "statetel",
+      "total_rows": 0,
+      "row_stats": {
+        "total": 0,
+        "S": 0,
+        "C": 0,
+        "U": 0,
+        "T\\S\\OCC": 0,
+        "unclassified": 0
+      },
+      "processing_time_seconds": 0.0,
+      "output_file": "outputs/statetel_inventory_output.xlsx",
+      "warnings_count": 0,
+      "errors_count": 0
+    },
+    {
+      "carrier": "Directv",
+      "carrier_key": "directv",
+      "total_rows": 0,
+      "row_stats": {
+        "total": 0,
+        "S": 0,
+        "C": 0,
+        "U": 0,
+        "T\\S\\OCC": 0,
+        "unclassified": 0
+      },
+      "processing_time_seconds": 0.0,
+      "output_file": "outputs/directv_inventory_output.xlsx",
+      "warnings_count": 1,
+      "errors_count": 0
+    },
+    {
+      "carrier": "BCN Telecom",
+      "carrier_key": "bcn_telecom",
+      "total_rows": 0,
+      "row_stats": {
+        "total": 0,
+        "S": 0,
+        "C": 0,
+        "U": 0,
+        "T\\S\\OCC": 0,
+        "unclassified": 0
+      },
+      "processing_time_seconds": 0.0,
+      "output_file": "outputs/bcn_telecom_inventory_output.xlsx",
+      "warnings_count": 1,
+      "errors_count": 0
+    },
+    {
+      "carrier": "Allstar Systems",
+      "carrier_key": "allstar",
+      "total_rows": 0,
+      "row_stats": {
+        "total": 0,
+        "S": 0,
+        "C": 0,
+        "U": 0,
+        "T\\S\\OCC": 0,
+        "unclassified": 0
+      },
+      "processing_time_seconds": 0.0,
+      "output_file": "outputs/allstar_inventory_output.xlsx",
+      "warnings_count": 1,
+      "errors_count": 0
+    },
+    {
+      "carrier": "Lumen",
+      "carrier_key": "lumen",
+      "total_rows": 1,
+      "row_stats": {
+        "total": 1,
+        "S": 1,
+        "C": 0,
+        "U": 0,
+        "T\\S\\OCC": 0,
+        "unclassified": 0
+      },
+      "processing_time_seconds": 0.03,
+      "output_file": "outputs/lumen_inventory_output.xlsx",
+      "warnings_count": 0,
+      "errors_count": 0
+    },
+    {
+      "carrier": "Crown Castle",
+      "carrier_key": "crown_castle",
+      "total_rows": 0,
+      "row_stats": {
+        "total": 0,
+        "S": 0,
+        "C": 0,
+        "U": 0,
+        "T\\S\\OCC": 0,
+        "unclassified": 0
+      },
+      "processing_time_seconds": 0.0,
+      "output_file": "outputs/crown_castle_inventory_output.xlsx",
+      "warnings_count": 1,
+      "errors_count": 0
+    },
+    {
+      "carrier": "FirstLight Fiber",
+      "carrier_key": "firstlight",
+      "total_rows": 0,
+      "row_stats": {
+        "total": 0,
+        "S": 0,
+        "C": 0,
+        "U": 0,
+        "T\\S\\OCC": 0,
+        "unclassified": 0
+      },
+      "processing_time_seconds": 0.0,
+      "output_file": "outputs/firstlight_inventory_output.xlsx",
+      "warnings_count": 1,
+      "errors_count": 0
+    },
+    {
+      "carrier": "Message Media",
+      "carrier_key": "message_media",
+      "total_rows": 0,
+      "row_stats": {
+        "total": 0,
+        "S": 0,
+        "C": 0,
+        "U": 0,
+        "T\\S\\OCC": 0,
+        "unclassified": 0
+      },
+      "processing_time_seconds": 0.0,
+      "output_file": "outputs/message_media_inventory_output.xlsx",
+      "warnings_count": 0,
+      "errors_count": 0
+    },
+    {
+      "carrier": "Mid Hudson",
+      "carrier_key": "mid_hudson",
+      "total_rows": 0,
+      "row_stats": {
+        "total": 0,
+        "S": 0,
+        "C": 0,
+        "U": 0,
+        "T\\S\\OCC": 0,
+        "unclassified": 0
+      },
+      "processing_time_seconds": 0.0,
+      "output_file": "outputs/mid_hudson_inventory_output.xlsx",
+      "warnings_count": 1,
+      "errors_count": 0
+    },
+    {
+      "carrier": "Zayo",
+      "carrier_key": "zayo",
+      "total_rows": 0,
+      "row_stats": {
+        "total": 0,
+        "S": 0,
+        "C": 0,
+        "U": 0,
+        "T\\S\\OCC": 0,
+        "unclassified": 0
+      },
+      "processing_time_seconds": 0.0,
+      "output_file": "outputs/zayo_inventory_output.xlsx",
+      "warnings_count": 1,
+      "errors_count": 0
+    }
+  ],
+  "total_warnings": 14,
+  "total_errors": 0
+}

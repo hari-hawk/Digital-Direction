@@ -1,6 +1,7 @@
 from __future__ import annotations
 """Extraction router: run pipeline and get results."""
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -10,6 +11,17 @@ from pydantic import BaseModel
 from typing import Optional
 
 router = APIRouter(tags=["extraction"])
+
+# Load API key from .env
+_env_path = Path(__file__).resolve().parent.parent / ".env"
+if _env_path.exists():
+    for line in _env_path.read_text().splitlines():
+        line = line.strip()
+        if line and not line.startswith("#") and "=" in line:
+            key, val = line.split("=", 1)
+            os.environ.setdefault(key.strip(), val.strip())
+
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 
 
 class ExtractionRequest(BaseModel):
@@ -36,8 +48,10 @@ async def run_extraction(project_id: str, req: ExtractionRequest, request: Reque
         "--input-dir", proj["input_dir"],
         "--output-dir", proj["output_dir"],
     ]
-    if req.api_key:
-        cmd.extend(["--anthropic-api-key", req.api_key])
+    # Use provided key, or fall back to .env key
+    api_key = req.api_key or ANTHROPIC_API_KEY
+    if api_key:
+        cmd.extend(["--anthropic-api-key", api_key])
 
     try:
         result = subprocess.run(
