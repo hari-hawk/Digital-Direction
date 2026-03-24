@@ -10,6 +10,7 @@ const navItems = [
   { href: "/documents", label: "Documents", icon: "\u{1F4C1}" },
   { href: "/inventory", label: "Inventory", icon: "\u{1F4CB}" },
   { href: "/extraction", label: "Extraction", icon: "\u{2699}\u{FE0F}" },
+  { href: "/accuracy", label: "Accuracy", icon: "\u{1F3AF}" },
   { href: "/insights", label: "Insights", icon: "\u{1F4A1}" },
 ];
 

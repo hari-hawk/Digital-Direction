@@ -101,10 +101,64 @@ export interface CostBreakdown {
   avg_mrc_per_service: number;
 }
 
+export interface AccuracySummary {
+  overall_match_rate: number;
+  total_ref_rows: number;
+  total_ext_rows: number;
+  matched_rows: number;
+  missing_rows: number;
+  extra_rows: number;
+  columns_compared: number;
+}
+
+export interface CarrierAccuracy {
+  carrier: string;
+  ref_rows: number;
+  matched_rows: number;
+  match_rate: number;
+}
+
+export interface ColumnAccuracy {
+  column: string;
+  accuracy: number;
+}
+
+export interface MismatchInfo {
+  column: string;
+  accuracy: number;
+  examples: { ref_value: string; ext_value: string }[];
+}
+
+export interface MissingCarrier {
+  carrier: string;
+  missing_rows: number;
+}
+
+export interface AccuracyResponse {
+  has_data: boolean;
+  error?: string;
+  summary?: AccuracySummary;
+  per_carrier?: CarrierAccuracy[];
+  per_column?: ColumnAccuracy[];
+  top_mismatches?: MismatchInfo[];
+  missing_carriers?: MissingCarrier[];
+}
+
 export const api = {
   getStats: (projectId: string) => fetchApi<ProjectStats>(`/projects/${projectId}/stats`),
   getSpendByCarrier: (projectId: string) => fetchApi<CarrierSpend[]>(`/projects/${projectId}/spend-by-carrier`),
   getServiceTypes: (projectId: string) => fetchApi<ServiceTypeCount[]>(`/projects/${projectId}/service-types`),
+  getEnhancedDashboard: (projectId: string) => fetchApi<{
+    scu_breakdown: { carrier: string; s_rows: number; c_rows: number; t_rows: number; u_rows: number; total: number; mrc: number }[];
+    contract_expiry: { category: string; count: number; color: string }[];
+    month_to_month_count: number;
+    data_quality: Record<string, number>;
+    avg_data_quality: number;
+    cost_by_service_type: { service_type: string; mrc: number; count: number; services: number }[];
+    top_locations: { address: string; mrc: number }[];
+    status_distribution: { status: string; count: number }[];
+    health_score: number;
+  }>(`/projects/${projectId}/dashboard/enhanced`),
   getDocuments: (projectId: string) => fetchApi<CarrierDocs[]>(`/projects/${projectId}/documents`),
   getCarriers: (projectId: string) => fetchApi<CarrierSummary[]>(`/projects/${projectId}/documents/carriers`),
   getInventory: (projectId: string, params: Record<string, string>) => {
@@ -137,6 +191,7 @@ export const api = {
     fetchApi<Record<string, unknown>>(`/projects/${projectId}/extraction/status?carrier_key=${carrierKey}`),
   getExtractionCarriers: (projectId: string) =>
     fetchApi<{ key: string; name: string; tier: number; status: string }[]>(`/projects/${projectId}/extraction/carriers`),
+  getAccuracy: (projectId: string) => fetchApi<AccuracyResponse>(`/projects/${projectId}/accuracy`),
   getInsights: (projectId: string) => fetchApi<InsightFlag[]>(`/projects/${projectId}/insights`),
   getCostBreakdown: (projectId: string) => fetchApi<CostBreakdown[]>(`/projects/${projectId}/insights/cost-breakdown`),
 

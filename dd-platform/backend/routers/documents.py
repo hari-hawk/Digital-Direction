@@ -1,3 +1,4 @@
+from __future__ import annotations
 """Documents router: file browser, upload, preview."""
 import io
 import mimetypes

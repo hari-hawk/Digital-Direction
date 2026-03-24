@@ -1,4 +1,6 @@
 """Analytics service: reads inventory data and computes dashboard metrics."""
+from __future__ import annotations
+
 import logging
 from pathlib import Path
 from functools import lru_cache
@@ -8,7 +10,7 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 # Cache for inventory data
-_inventory_cache: dict[str, pd.DataFrame] = {}
+_inventory_cache = {}  # type: dict
 
 
 def load_inventory(file_path: str, force_reload: bool = False) -> pd.DataFrame:

@@ -1,3 +1,4 @@
+from __future__ import annotations
 """Pydantic models for API responses."""
 from pydantic import BaseModel
 from typing import Optional

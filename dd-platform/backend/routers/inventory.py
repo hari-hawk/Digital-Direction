@@ -1,3 +1,4 @@
+from __future__ import annotations
 """Inventory router: read and filter inventory data with multi-sheet support."""
 from pathlib import Path
 
@@ -11,7 +12,7 @@ from services.analytics_service import get_inventory_rows, load_inventory
 router = APIRouter(tags=["inventory"])
 
 # Cache for sheet data
-_sheet_cache: dict[str, dict] = {}
+_sheet_cache = {}  # type: dict
 
 
 def _resolve_file(proj: dict, source: str) -> str:

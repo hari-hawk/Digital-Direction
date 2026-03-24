@@ -1,3 +1,4 @@
+from __future__ import annotations
 """File system operations: scan directories, classify documents."""
 import os
 from pathlib import Path

@@ -1,3 +1,4 @@
+from __future__ import annotations
 """
 Persistence service — Neon PostgreSQL backend.
 Stores project configs, checklists, extraction runs, and file metadata.

@@ -1,3 +1,4 @@
+from __future__ import annotations
 """Insights router: audit flags, cost analysis, anomaly detection."""
 from fastapi import APIRouter, Request
 

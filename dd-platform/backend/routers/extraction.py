@@ -1,3 +1,4 @@
+from __future__ import annotations
 """Extraction router: run pipeline and get results."""
 import json
 import subprocess

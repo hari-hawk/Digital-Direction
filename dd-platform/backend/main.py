@@ -1,3 +1,4 @@
+from __future__ import annotations
 """Digital Direction POC — FastAPI Backend with persistent storage."""
 import logging
 from pathlib import Path
@@ -5,7 +6,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import dashboard, documents, inventory, extraction, insights
+from routers import dashboard, documents, inventory, extraction, insights, accuracy
 from services.persistence import load_projects, save_project
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
@@ -62,6 +63,7 @@ app.include_router(documents.router, prefix="/api")
 app.include_router(inventory.router, prefix="/api")
 app.include_router(extraction.router, prefix="/api")
 app.include_router(insights.router, prefix="/api")
+app.include_router(accuracy.router, prefix="/api")
 
 
 @app.get("/api/health")
