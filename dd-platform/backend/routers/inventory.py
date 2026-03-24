@@ -14,26 +14,89 @@ router = APIRouter(tags=["inventory"])
 # Cache for sheet data
 _sheet_cache = {}  # type: dict
 
+# In-memory store for row status/comments (POC — replace with Neon DB later)
+_row_status_store: dict[str, dict[int, dict]] = {}  # project_id -> { row_index -> { status, comment } }
+
+# Required fields used to compute per-row accuracy
+_REQUIRED_FIELDS = [
+    "Carrier", "Carrier Account Number", "Service Type", "Charge Type",
+    "Service or Component", "Billing Name", "Service Address 1", "City",
+    "State", "Zip", "Phone Number", "Carrier Circuit Number",
+    "Monthly Recurring Cost", "Component or Feature Name",
+]
+
+
+def _compute_row_accuracy(row_data: dict) -> int:
+    """Compute accuracy 0-100 based on how many required fields are populated."""
+    populated = 0
+    total = 0
+    for field in _REQUIRED_FIELDS:
+        # Match case-insensitively against the row data keys
+        matched_key = next((k for k in row_data if k.strip().lower() == field.lower()), None)
+        if matched_key is None:
+            # Also try partial match
+            matched_key = next((k for k in row_data if field.lower() in k.lower()), None)
+        total += 1
+        if matched_key:
+            val = row_data.get(matched_key)
+            if val is not None and str(val).strip() not in ("", "nan", "None"):
+                populated += 1
+    return round((populated / total) * 100) if total > 0 else 0
+
+
+def _get_row_status(project_id: str, row_index: int, accuracy: int) -> str:
+    """Get status for a row: user-set status takes priority, else auto-derived."""
+    store = _row_status_store.get(project_id, {})
+    entry = store.get(row_index)
+    if entry and entry.get("status"):
+        return entry["status"]
+    # Auto-derive from accuracy
+    if accuracy >= 90:
+        return "completed"
+    return "need_review"
+
+
+def _get_source_files(proj: dict) -> list[str]:
+    """Get list of source document filenames for the project."""
+    source_files: list[str] = []
+    output_dir = Path(proj.get("output_dir", ""))
+    if output_dir.exists():
+        for f in sorted(output_dir.glob("*_inventory_output.xlsx")):
+            source_files.append(f.name)
+    doc_dir = Path(proj.get("documents_dir", ""))
+    if doc_dir.exists():
+        for f in sorted(doc_dir.iterdir()):
+            if f.is_file() and f.suffix.lower() in (".pdf", ".xlsx", ".xls", ".csv", ".msg"):
+                source_files.append(f.name)
+    return source_files[:10]  # Limit to 10
+
 
 def _resolve_file(proj: dict, source: str) -> str:
+    ref = proj.get("reference_file", "") or ""
     if source == "extracted":
-        output_dir = Path(proj["output_dir"])
-        # Prefer the combined all-carriers file
-        all_carriers = output_dir / "all_carriers_inventory_output.xlsx"
-        if all_carriers.exists():
-            return str(all_carriers)
-        output_files = sorted(output_dir.glob("*_inventory_output.xlsx"))
-        return str(output_files[-1]) if output_files else proj["reference_file"]
-    return proj["reference_file"]
+        out_dir = proj.get("output_dir", "")
+        if out_dir:
+            output_dir = Path(out_dir)
+            all_carriers = output_dir / "all_carriers_inventory_output.xlsx"
+            if all_carriers.exists():
+                return str(all_carriers)
+            output_files = sorted(output_dir.glob("*_inventory_output.xlsx"))
+            if output_files:
+                return str(output_files[-1])
+        return ref
+    return ref
 
 
 def _load_all_sheets(file_path: str) -> dict:
     """Load all sheet names and metadata from Excel file."""
+    if not file_path or not file_path.strip():
+        return {"sheets": []}
+
     if file_path in _sheet_cache:
         return _sheet_cache[file_path]
 
     path = Path(file_path)
-    if not path.exists():
+    if not path.exists() or not path.is_file():
         return {"sheets": []}
 
     wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
@@ -54,8 +117,10 @@ def _load_all_sheets(file_path: str) -> dict:
 
 def _load_sheet_data(file_path: str, sheet_name: str, header_row: int = None) -> pd.DataFrame:
     """Load specific sheet from Excel with correct header detection."""
+    if not file_path or not file_path.strip():
+        return pd.DataFrame()
     path = Path(file_path)
-    if not path.exists():
+    if not path.exists() or not path.is_file():
         return pd.DataFrame()
 
     # Baseline uses header row 2 (0-indexed), others use 0
@@ -107,7 +172,7 @@ async def list_inventory(
     file_path = _resolve_file(proj, source)
 
     if sheet.strip() == "Baseline":
-        return get_inventory_rows(
+        result = get_inventory_rows(
             file_path=file_path,
             carrier=carrier,
             service_type=service_type,
@@ -120,6 +185,14 @@ async def list_inventory(
             page=page,
             page_size=page_size,
         )
+        # Enrich each row with accuracy, review status, and source files
+        source_files = _get_source_files(proj)
+        for row in result.get("rows", []):
+            acc = _compute_row_accuracy(row.get("data", {}))
+            row["accuracy"] = acc
+            row["status"] = _get_row_status(project_id, row["row_index"], acc)
+            row["source_files"] = source_files
+        return result
 
     # Generic sheet loading for non-Baseline sheets
     df = _load_sheet_data(file_path, sheet)
@@ -221,9 +294,11 @@ async def get_checklist(project_id: str, request: Request, source: str = "refere
         return {"error": "Project not found"}
 
     file_path = _resolve_file(proj, source)
+    if not file_path or not file_path.strip():
+        return {"items": [], "columns": []}
     path = Path(file_path)
-    if not path.exists():
-        return {"items": []}
+    if not path.exists() or not path.is_file():
+        return {"items": [], "columns": []}
 
     # Find checklist sheet (may have leading space)
     wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
@@ -262,6 +337,86 @@ async def update_checklist(project_id: str, request: Request):
     return {"status": "saved", "count": len(items)}
 
 
+@router.post("/projects/{project_id}/inventory/row-status")
+async def update_row_status(project_id: str, request: Request):
+    """Update status and comment for a specific inventory row."""
+    proj = request.app.state.projects.get(project_id)
+    if not proj:
+        return {"error": "Project not found"}
+
+    data = await request.json()
+    row_index = data.get("row_index")
+    status = data.get("status", "in_progress")
+    comment = data.get("comment", "")
+
+    if row_index is None:
+        return {"error": "row_index is required"}
+
+    valid_statuses = ("completed", "need_review", "critical", "in_progress")
+    if status not in valid_statuses:
+        return {"error": f"Invalid status. Must be one of: {valid_statuses}"}
+
+    if project_id not in _row_status_store:
+        _row_status_store[project_id] = {}
+
+    _row_status_store[project_id][int(row_index)] = {
+        "status": status,
+        "comment": comment,
+    }
+
+    return {"status": "saved", "row_index": row_index, "new_status": status}
+
+
+@router.get("/projects/{project_id}/inventory/row-detail")
+async def get_row_detail(
+    project_id: str,
+    request: Request,
+    row_index: int = 0,
+    source: str = "reference",
+):
+    """Get full detail for a single inventory row with all columns as field/value pairs."""
+    proj = request.app.state.projects.get(project_id)
+    if not proj:
+        return {"error": "Project not found"}
+
+    file_path = _resolve_file(proj, source)
+    df = load_inventory(file_path)
+    if df.empty or row_index not in df.index:
+        return {"error": "Row not found"}
+
+    row = df.loc[row_index]
+    fields: list[dict] = []
+    row_data: dict = {}
+
+    for col in df.columns:
+        val = row[col]
+        if pd.isna(val):
+            clean_val = None
+        elif hasattr(val, "item"):
+            clean_val = val.item()
+        elif hasattr(val, "isoformat"):
+            clean_val = val.isoformat()
+        else:
+            clean_val = val
+        fields.append({"field_name": col, "field_value": clean_val})
+        row_data[col] = clean_val
+
+    accuracy = _compute_row_accuracy(row_data)
+    status = _get_row_status(project_id, row_index, accuracy)
+    store = _row_status_store.get(project_id, {})
+    comment = store.get(row_index, {}).get("comment", "")
+    source_files = _get_source_files(proj)
+
+    return {
+        "row_index": row_index,
+        "fields": fields,
+        "accuracy_score": accuracy,
+        "status": status,
+        "comment": comment,
+        "source_documents": source_files,
+    }
+
+
 @router.get("/projects/{project_id}/inventory/export")
 async def export_inventory(project_id: str, request: Request, source: str = "reference"):
     proj = request.app.state.projects.get(project_id)
@@ -279,3 +434,208 @@ async def export_inventory(project_id: str, request: Request, source: str = "ref
         return FileResponse(ref_path, filename=ref_path.name)
 
     return {"error": "No inventory file found"}
+
+
+# ─── Auto-populate checklist ────────────────────────────
+
+import re
+
+
+def _find_col(df: pd.DataFrame, *names: str):
+    """Find a DataFrame column matching any of the given names (case-insensitive partial match)."""
+    for name in names:
+        for col in df.columns:
+            if name.lower() in col.lower():
+                return col
+    return None
+
+
+def _check_s_record_missing(df: pd.DataFrame) -> dict:
+    """Check whether S record missing and only C record exists."""
+    scu_col = _find_col(df, "service or component")
+    if not scu_col:
+        return {"result": "N/A", "detail": "Column not found"}
+    c_rows = df[df[scu_col].astype(str).str.strip() == "C"]
+    s_rows = df[df[scu_col].astype(str).str.strip() == "S"]
+    # Check if any C-row account IDs have no parent S-row
+    acct_col = _find_col(df, "account", "acct")
+    if not acct_col:
+        return {"result": "N/A", "detail": "Account column not found"}
+    s_accounts = set(s_rows[acct_col].dropna().astype(str).str.strip())
+    orphan_c = c_rows[~c_rows[acct_col].astype(str).str.strip().isin(s_accounts)]
+    count = len(orphan_c)
+    return {
+        "result": "Yes" if count > 0 else "No",
+        "detail": f"{count} C-rows without parent S-row" if count > 0 else "All C-rows have parent S-rows",
+    }
+
+
+def _check_subtotal_mismatch(df: pd.DataFrame) -> dict:
+    """Check if S-row MRC = sum of child C-row MRCs."""
+    scu_col = _find_col(df, "service or component")
+    mrc_col = _find_col(df, "monthly recurring")
+    acct_col = _find_col(df, "account", "acct")
+    if not all([scu_col, mrc_col, acct_col]):
+        return {"result": "N/A", "detail": "Required columns not found"}
+
+    s_rows = df[df[scu_col].astype(str).str.strip() == "S"].copy()
+    c_rows = df[df[scu_col].astype(str).str.strip() == "C"].copy()
+    s_rows[mrc_col] = pd.to_numeric(s_rows[mrc_col], errors="coerce").fillna(0)
+    c_rows[mrc_col] = pd.to_numeric(c_rows[mrc_col], errors="coerce").fillna(0)
+
+    mismatches = 0
+    for _, s_row in s_rows.iterrows():
+        acct = str(s_row[acct_col]).strip()
+        s_mrc = round(float(s_row[mrc_col]), 2)
+        children = c_rows[c_rows[acct_col].astype(str).str.strip() == acct]
+        c_sum = round(float(children[mrc_col].sum()), 2)
+        if abs(s_mrc - c_sum) > 0.01:
+            mismatches += 1
+
+    return {
+        "result": "Yes" if mismatches > 0 else "No",
+        "detail": f"{mismatches} accounts with sub-total mismatch" if mismatches > 0 else "All sub-totals match",
+    }
+
+
+def _check_blank_field(df: pd.DataFrame, *col_names: str) -> dict:
+    """Check if any rows have blank values in the specified column."""
+    col = _find_col(df, *col_names)
+    if not col:
+        return {"result": "N/A", "detail": f"Column not found: {col_names}"}
+    blanks = df[col].isna() | (df[col].astype(str).str.strip() == "") | (df[col].astype(str).str.strip().str.lower() == "nan")
+    count = int(blanks.sum())
+    return {
+        "result": "Yes" if count > 0 else "No",
+        "detail": f"{count} rows with blank {col}" if count > 0 else f"All rows have {col} populated",
+    }
+
+
+def _check_phone_format(df: pd.DataFrame) -> dict:
+    """Validate phone number formats."""
+    phone_col = _find_col(df, "phone", "telephone", "btn", "billing telephone")
+    if not phone_col:
+        return {"result": "N/A", "detail": "Phone column not found"}
+    phone_pattern = re.compile(r"^[\d\-\(\)\s\+\.]{7,20}$")
+    invalid = 0
+    for val in df[phone_col].dropna().astype(str):
+        val = val.strip()
+        if val and val.lower() != "nan" and not phone_pattern.match(val):
+            invalid += 1
+    return {
+        "result": "Yes" if invalid > 0 else "No",
+        "detail": f"{invalid} rows with invalid phone format" if invalid > 0 else "All phone numbers valid",
+    }
+
+
+def _check_duplicate_rows(df: pd.DataFrame) -> dict:
+    """Check for duplicate rows based on key columns."""
+    scu_col = _find_col(df, "service or component")
+    acct_col = _find_col(df, "account", "acct")
+    circuit_col = _find_col(df, "circuit", "service id")
+    key_cols = [c for c in [acct_col, scu_col, circuit_col] if c]
+    if not key_cols:
+        return {"result": "N/A", "detail": "Key columns not found"}
+    dupes = df.duplicated(subset=key_cols, keep=False)
+    count = int(dupes.sum())
+    return {
+        "result": "Yes" if count > 0 else "No",
+        "detail": f"{count} potential duplicate rows" if count > 0 else "No duplicates found",
+    }
+
+
+# Map of checklist text keywords to validation functions
+_CHECKLIST_VALIDATORS = {
+    "s record missing": _check_s_record_missing,
+    "only c record": _check_s_record_missing,
+    "sub total mismatch": _check_subtotal_mismatch,
+    "subtotal mismatch": _check_subtotal_mismatch,
+    "service address not available": lambda df: _check_blank_field(df, "service address", "address"),
+    "service address": lambda df: _check_blank_field(df, "service address", "address"),
+    "billing name": lambda df: _check_blank_field(df, "billing name", "billing account name"),
+    "billing names should not be blank": lambda df: _check_blank_field(df, "billing name", "billing account name"),
+    "phone number format": _check_phone_format,
+    "phone number": _check_phone_format,
+    "duplicate": _check_duplicate_rows,
+    "contract expiry": lambda df: _check_blank_field(df, "contract", "expiry", "term"),
+    "status blank": lambda df: _check_blank_field(df, "status"),
+    "carrier blank": lambda df: _check_blank_field(df, "carrier"),
+    "mrc zero": lambda df: {
+        "result": "Yes" if int((pd.to_numeric(df[_find_col(df, "monthly recurring")] if _find_col(df, "monthly recurring") else pd.Series(), errors="coerce").fillna(0) == 0).sum()) > 0 else "No",
+        "detail": f"{int((pd.to_numeric(df[_find_col(df, 'monthly recurring')] if _find_col(df, 'monthly recurring') else pd.Series(), errors='coerce').fillna(0) == 0).sum())} rows with zero MRC",
+    },
+}
+
+
+@router.post("/projects/{project_id}/inventory/checklist/auto-populate")
+async def auto_populate_checklist(project_id: str, request: Request):
+    """Auto-populate checklist based on extracted data validation."""
+    proj = request.app.state.projects.get(project_id)
+    if not proj:
+        return {"error": "Project not found"}
+
+    # Load extracted data (prefer extracted, fall back to reference)
+    file_path = _resolve_file(proj, "extracted")
+    df = load_inventory(file_path)
+    if df.empty:
+        file_path = _resolve_file(proj, "reference")
+        df = load_inventory(file_path)
+
+    if df.empty:
+        return {"error": "No inventory data available"}
+
+    # Load current checklist
+    ref_path = proj.get("reference_file", "")
+    checklist_items = []
+    if ref_path and Path(ref_path).exists():
+        wb = openpyxl.load_workbook(ref_path, read_only=True, data_only=True)
+        checklist_sheet = None
+        for name in wb.sheetnames:
+            if "checklist" in name.lower():
+                checklist_sheet = name
+                break
+        wb.close()
+
+        if checklist_sheet:
+            cdf = pd.read_excel(ref_path, sheet_name=checklist_sheet, header=0)
+            cdf.columns = [str(c).strip() for c in cdf.columns]
+            for _, row in cdf.iterrows():
+                item = {}
+                for col in cdf.columns:
+                    val = row[col]
+                    item[col] = None if pd.isna(val) else str(val)
+                if item.get("Checklist"):
+                    checklist_items.append(item)
+
+    if not checklist_items:
+        return {"error": "No checklist items found"}
+
+    # Auto-populate each checklist item
+    results = []
+    for item in checklist_items:
+        text = (item.get("Checklist") or "").lower()
+        validation_result = None
+
+        # Try to match against known validators
+        for keyword, validator in _CHECKLIST_VALIDATORS.items():
+            if keyword in text:
+                try:
+                    validation_result = validator(df)
+                except Exception:
+                    validation_result = {"result": "N/A", "detail": "Validation error"}
+                break
+
+        if validation_result:
+            item["Agent - Yes/No"] = validation_result["result"]
+            item["_auto_detail"] = validation_result["detail"]
+        else:
+            item["Agent - Yes/No"] = item.get("Agent - Yes/No") or "N/A"
+            item["_auto_detail"] = "No automated check available"
+
+        results.append(item)
+
+    return {
+        "items": results,
+        "auto_populated": sum(1 for r in results if r.get("_auto_detail") != "No automated check available"),
+        "total": len(results),
+    }

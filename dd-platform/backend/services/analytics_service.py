@@ -15,14 +15,21 @@ _inventory_cache = {}  # type: dict
 
 def load_inventory(file_path: str, force_reload: bool = False) -> pd.DataFrame:
     """Load inventory data from Excel file with caching."""
+    if not file_path or not file_path.strip():
+        return pd.DataFrame()
+
     if file_path in _inventory_cache and not force_reload:
         return _inventory_cache[file_path]
 
     path = Path(file_path)
-    if not path.exists():
+    if not path.exists() or not path.is_file():
         return pd.DataFrame()
 
-    df = pd.read_excel(path, sheet_name="Baseline", header=2)
+    try:
+        df = pd.read_excel(path, sheet_name="Baseline", header=2)
+    except Exception as e:
+        logger.error(f"Failed to load {path.name}: {e}")
+        return pd.DataFrame()
     # Normalize column names
     df.columns = [str(c).strip() for c in df.columns]
     _inventory_cache[file_path] = df

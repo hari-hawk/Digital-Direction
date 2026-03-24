@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
 import { useProjectId } from "@/hooks/useProjectId";
+import { toast } from "@/components/ui/toaster";
 
 interface UploadResult {
   file: string;
