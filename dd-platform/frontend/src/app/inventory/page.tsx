@@ -361,7 +361,15 @@ export default function InventoryPage() {
         setActiveSheet("Baseline");
       }
     }).catch(() => {});
-    api.getInventoryFilters(projectId, source).then(setFilterOptions).catch(() => {});
+    api.getInventoryFilters(projectId, source).then((data) => {
+      setFilterOptions({
+        carriers: data?.carriers || [],
+        service_types: data?.service_types || [],
+        charge_types: data?.charge_types || [],
+        scu_codes: data?.scu_codes || [],
+        statuses: data?.statuses || [],
+      });
+    }).catch(() => {});
     api.getConfidenceSummary(projectId, source).then(setConfidence).catch(() => {});
   }, [projectId, source]);
 
@@ -669,7 +677,7 @@ export default function InventoryPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {confidence.extraction_methods.map((m) => (
+                      {(confidence.extraction_methods || []).map((m) => (
                         <tr key={m.carrier} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
                           <td className="py-1 px-3 text-zinc-300">{m.carrier}</td>
                           <td className="text-right py-1 px-3 text-zinc-400 font-mono">{m.rows.toLocaleString()}</td>
@@ -810,7 +818,7 @@ export default function InventoryPage() {
                   <select value={filters.carrier} onChange={(e) => updateFilter("carrier", e.target.value)}
                     className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-sm h-9">
                     <option value="">All Carriers</option>
-                    {filterOptions.carriers.map((v) => <option key={v} value={v}>{v}</option>)}
+                    {(filterOptions.carriers || []).map((v) => <option key={v} value={v}>{v}</option>)}
                   </select>
                 </div>
                 <div>
@@ -818,7 +826,7 @@ export default function InventoryPage() {
                   <select value={filters.service_type} onChange={(e) => updateFilter("service_type", e.target.value)}
                     className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-sm h-9">
                     <option value="">All Types</option>
-                    {filterOptions.service_types.map((v) => <option key={v} value={v}>{v}</option>)}
+                    {(filterOptions.service_types || []).map((v) => <option key={v} value={v}>{v}</option>)}
                   </select>
                 </div>
                 <div>
@@ -826,7 +834,7 @@ export default function InventoryPage() {
                   <select value={filters.status} onChange={(e) => updateFilter("status", e.target.value)}
                     className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-sm h-9">
                     <option value="">All Statuses</option>
-                    {filterOptions.statuses.map((v) => <option key={v} value={v}>{v}</option>)}
+                    {(filterOptions.statuses || []).map((v) => <option key={v} value={v}>{v}</option>)}
                   </select>
                 </div>
                 <div>
@@ -834,7 +842,7 @@ export default function InventoryPage() {
                   <select value={filters.scu_code} onChange={(e) => updateFilter("scu_code", e.target.value)}
                     className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-sm h-9">
                     <option value="">All</option>
-                    {filterOptions.scu_codes.map((v) => <option key={v} value={v}>{v}</option>)}
+                    {(filterOptions.scu_codes || []).map((v) => <option key={v} value={v}>{v}</option>)}
                   </select>
                 </div>
                 <div>
@@ -842,7 +850,7 @@ export default function InventoryPage() {
                   <select value={filters.charge_type} onChange={(e) => updateFilter("charge_type", e.target.value)}
                     className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-sm h-9">
                     <option value="">All</option>
-                    {filterOptions.charge_types.map((v) => <option key={v} value={v}>{v}</option>)}
+                    {(filterOptions.charge_types || []).map((v) => <option key={v} value={v}>{v}</option>)}
                   </select>
                 </div>
                 <div>
