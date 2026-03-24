@@ -56,56 +56,101 @@ def _get_row_status(project_id: str, row_index: int, accuracy: int) -> str:
     return "need_review"
 
 
-def _get_source_files(proj: dict, carrier_name: str = "") -> list[dict]:
-    """Get list of source document info (label + path) for a specific carrier."""
-    source_files: list[dict] = []
+def _get_source_files(proj: dict, carrier_name: str = "", row_data: dict = None) -> list[dict]:
+    """Get source documents specific to this row based on invoice filename, account number, and carrier.
+
+    Matching priority:
+    1. Exact invoice filename match (from Invoice File Name column)
+    2. Files Used For Inventory column values
+    3. Carrier Account Number appears in filename
+    4. Fallback: carrier name in folder/filename
+    """
     input_dir = Path(proj.get("input_dir", ""))
-
     if not input_dir.exists():
-        return source_files
+        return []
 
-    # Search for carrier-specific files in input directories
-    carrier_lower = carrier_name.lower().strip() if carrier_name else ""
-    carrier_words = carrier_lower.split()[:2]  # First 2 words for matching
+    # Extract row identifiers for matching
+    row_data = row_data or {}
+    invoice_file = str(row_data.get("Invoice File Name", "") or "").strip()
+    files_used = str(row_data.get("Files Used For Inventory", "") or "").strip()
+    carrier = str(row_data.get("Carrier", carrier_name) or carrier_name or "").strip()
+    account_num = str(row_data.get("Carrier Account Number", "") or "").strip()
 
+    # Build search terms from row data
+    search_terms = set()
+    if invoice_file and invoice_file.lower() not in ("nan", "none", ""):
+        clean = invoice_file.replace(".pdf", "").replace(".PDF", "").strip()
+        search_terms.add(clean.lower())
+    if files_used and files_used.lower() not in ("nan", "none", ""):
+        for part in files_used.split(","):
+            clean = part.strip().replace(".pdf", "").replace(".PDF", "").strip()
+            if clean and clean.lower() not in ("nan", "none"):
+                search_terms.add(clean.lower())
+
+    carrier_lower = carrier.lower()
+    carrier_words = carrier_lower.split()[:2] if carrier_lower else []
+    acct_clean = account_num.lower().replace(" ", "").replace("-", "") if account_num else ""
+
+    # Scan all files in input directory
+    scored: list[tuple] = []
     for category in ["Invoices", "Contracts", "Carrier Reports, Portal Data, ETC", "CSRs"]:
         cat_dir = input_dir / category
         if not cat_dir.exists():
             continue
+        doc_type = ("Invoice" if "invoice" in category.lower() else
+                    "Contract" if "contract" in category.lower() else
+                    "Report" if "report" in category.lower() else "CSR")
 
-        # Check carrier-named subfolders
-        for sub in cat_dir.iterdir():
-            if sub.is_dir():
-                sub_lower = sub.name.lower()
-                # Match carrier name against folder name
-                if carrier_words and any(w in sub_lower for w in carrier_words):
-                    for f in sorted(sub.iterdir()):
-                        if f.is_file() and f.suffix.lower() in (".pdf", ".xlsx", ".xls", ".csv", ".msg", ".docx"):
-                            doc_type = "Invoice" if "invoice" in category.lower() else \
-                                       "Contract" if "contract" in category.lower() else \
-                                       "Report" if "report" in category.lower() else "CSR"
-                            source_files.append({
-                                "label": f"{doc_type}: {f.name}",
-                                "name": f.name,
-                                "path": str(f),
-                                "format": f.suffix.lower().lstrip("."),
-                                "doc_type": doc_type.lower(),
-                            })
-            elif sub.is_file() and carrier_words:
-                # Check files directly in category folder
-                if any(w in sub.name.lower() for w in carrier_words):
-                    doc_type = "Invoice" if "invoice" in category.lower() else \
-                               "Contract" if "contract" in category.lower() else \
-                               "Report" if "report" in category.lower() else "CSR"
-                    source_files.append({
-                        "label": f"{doc_type}: {sub.name}",
-                        "name": sub.name,
-                        "path": str(sub),
-                        "format": sub.suffix.lower().lstrip("."),
-                        "doc_type": doc_type.lower(),
-                    })
+        for f in cat_dir.rglob("*"):
+            if not f.is_file() or f.suffix.lower() not in (".pdf", ".xlsx", ".xls", ".csv", ".msg", ".docx"):
+                continue
 
-    return source_files[:15]
+            score = 0
+            fstem = f.stem.lower()
+            fname_clean = f.name.lower().replace(" ", "").replace("-", "").replace("_", "")
+
+            # Priority 1: Exact invoice filename match
+            for term in search_terms:
+                term_clean = term.replace(" ", "").replace("-", "").replace("_", "")
+                # Must match at least 80% of the search term for it to be "exact"
+                min_match_len = max(20, int(len(term_clean) * 0.8))
+                if term_clean in fname_clean or (len(term_clean) > 10 and fname_clean.startswith(term_clean[:min_match_len])):
+                    score += 100
+                    break
+
+            # Priority 2: Account number in filename
+            if acct_clean and len(acct_clean) >= 5 and acct_clean in fname_clean:
+                score += 50
+
+            # Priority 3: Carrier name in path
+            if carrier_words and any(w in fstem for w in carrier_words):
+                score += 5
+
+            if score > 0:
+                scored.append((score, {
+                    "label": f"{doc_type}: {f.name}",
+                    "name": f.name,
+                    "path": str(f),
+                    "format": f.suffix.lower().lstrip("."),
+                    "doc_type": doc_type.lower(),
+                }))
+
+    # Sort by score descending, deduplicate
+    scored.sort(key=lambda x: x[0], reverse=True)
+    seen = set()
+    result = []
+    for score, info in scored:
+        if info["name"] not in seen:
+            result.append((score, info))
+            seen.add(info["name"])
+
+    # If we have exact matches (score >= 100), ONLY return those + account matches
+    exact = [info for score, info in result if score >= 50]
+    if exact:
+        return exact[:5]
+
+    # Otherwise return carrier-level files
+    return [info for _, info in result[:5]]
 
 
 def _resolve_file(proj: dict, source: str) -> str:
@@ -227,19 +272,14 @@ async def list_inventory(
 
         # Compute accuracy and review status for EVERY row
         all_rows = full_result.get("rows", [])
-        # Cache source files per carrier to avoid repeated filesystem scans
-        _source_cache: dict = {}
-        carrier_col_name = next((c for c in (full_result.get("columns") or []) if c.strip().lower() == "carrier"), "Carrier")
+        # Compute accuracy and get row-specific source files
         for row in all_rows:
             acc = _compute_row_accuracy(row.get("data", {}))
             row["accuracy"] = acc
             row_review = _get_row_status(project_id, row["row_index"], acc)
             row["status"] = row_review
-            # Get carrier-specific source files
-            row_carrier = str(row.get("data", {}).get(carrier_col_name, "")).strip()
-            if row_carrier not in _source_cache:
-                _source_cache[row_carrier] = _get_source_files(proj, row_carrier)
-            row["source_files"] = _source_cache[row_carrier]
+            # Get source files specific to THIS row (by invoice filename + account number)
+            row["source_files"] = _get_source_files(proj, row_data=row.get("data", {}))
 
         # Apply review_status filter AFTER accuracy computation
         if review_status:
@@ -581,9 +621,8 @@ async def get_row_detail(
     status = _get_row_status(project_id, row_index, accuracy)
     store = _row_status_store.get(project_id, {})
     comment = store.get(row_index, {}).get("comment", "")
-    # Get carrier-specific source files
-    carrier_name = str(row_data.get("Carrier", row_data.get("Carrier ", ""))).strip()
-    source_files = _get_source_files(proj, carrier_name)
+    # Get source files specific to THIS row
+    source_files = _get_source_files(proj, row_data=row_data)
 
     return {
         "row_index": row_index,
